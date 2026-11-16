@@ -1,0 +1,50 @@
+fleet:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      catalog: fleet_dev
+      schema: "{{ env_var('DBT_DEV_SCHEMA', 'dev') }}"
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      auth_type: oauth
+      client_id: "{{ env_var('DATABRICKS_CLIENT_ID') }}"
+      client_secret: "{{ env_var('DATABRICKS_CLIENT_SECRET') }}"
+      threads: 4
+    ci:
+      type: databricks
+      catalog: fleet_dev
+      schema: ci
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      auth_type: oauth
+      client_id: "{{ env_var('DATABRICKS_CLIENT_ID') }}"
+      client_secret: "{{ env_var('DATABRICKS_CLIENT_SECRET') }}"
+      threads: 4
+    prod:
+      type: databricks
+      catalog: fleet
+      schema: default
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      auth_type: oauth
+      client_id: "{{ env_var('DATABRICKS_CLIENT_ID') }}"
+      client_secret: "{{ env_var('DATABRICKS_CLIENT_SECRET') }}"
+      threads: 8
+
+fleet_serving:
+  target: dev
+  outputs:
+    dev: &pg
+      type: postgres
+      host: "{{ env_var('PG_HOST', 'localhost') }}"
+      port: "{{ env_var('PG_PORT', '5432') | as_number }}"
+      user: "{{ env_var('PG_USER') }}"
+      password: "{{ env_var('PG_PASSWORD') }}"
+      dbname: "{{ env_var('PG_DBNAME') }}"
+      schema: serving
+      threads: 4
+    ci:
+      <<: *pg
+    prod:
+      <<: *pg

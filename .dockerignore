@@ -1,0 +1,19 @@
+.git
+.github
+.venv
+.env
+.env.*
+!.env.example
+**/__pycache__
+**/target
+**/dbt_packages
+**/logs
+.pytest_cache
+.ruff_cache
+out
+prod-state
+docs
+# Root-level markdown only. Docs blocks under dbt/ are .md files and must stay.
+*.md
+# pyproject uses ARCHITECTURE.md as readme; hatchling fails without it.
+!ARCHITECTURE.md

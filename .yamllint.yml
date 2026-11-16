@@ -1,0 +1,11 @@
+extends: default
+
+ignore: |
+  .venv/
+  .git/
+  **/dbt_packages/
+  **/target/
+
+rules:
+  document-start: disable
+  line-length: disable

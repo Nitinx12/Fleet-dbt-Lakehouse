@@ -70,6 +70,7 @@ fail_under = 80
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["notebooks", "scripts/_build_eda_notebooks.py", "scripts/_run_eda_notebooks.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
