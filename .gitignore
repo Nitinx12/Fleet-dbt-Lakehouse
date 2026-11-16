@@ -31,3 +31,4 @@ prod-state/
 .vscode/
 .DS_Store
 Thumbs.db
+dbt/.user.yml

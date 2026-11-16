@@ -352,7 +352,9 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: fleet_registry
-    ports: ["3306:3306"]
+    # Host port defaults to 13306: local mysqld often owns 3306 and Windows
+    # excludes 3307-3406. Override with MYSQL_HOST_PORT.
+    ports: ["${MYSQL_HOST_PORT:-13306}:3306"]
     volumes: ["mysql_data:/var/lib/mysql"]
 
   mongo:
