@@ -1,0 +1,132 @@
+
+LOGISTICS DATABASE SCHEMA
+=========================
+
+Two datastores are used:
+
+1. MySQL  -> database `fleet_registry`   (9 relational tables)
+2. MongoDB -> database `fleet_operations` (3 collections)
+
+Every record in both stores carries a `loaded_at` metadata column
+
+------------------------------------------------------------------------
+MYSQL: fleet_registry
+------------------------------------------------------------------------
+
+1. DRIVERS (150 rows)
+   - PK: driver_id
+   - first_name, last_name, hire_date, termination_date,
+     license_number, license_state, date_of_birth, home_terminal,
+     employment_status, cdl_class, years_experience, loaded_at
+
+2. TRUCKS (120 rows)
+   - PK: truck_id
+   - unit_number, make, model_year, vin, acquisition_date,
+     acquisition_mileage, fuel_type, tank_capacity_gallons,
+     status, home_terminal, loaded_at
+
+3. TRAILERS (180 rows)
+   - PK: trailer_id
+   - trailer_number, trailer_type, length_feet, model_year, vin,
+     acquisition_date, status, current_location, loaded_at
+
+4. CUSTOMERS (200 rows)
+   - PK: customer_id
+   - customer_name, customer_type, credit_terms_days,
+     primary_freight_type, account_status, contract_start_date,
+     annual_revenue_potential, loaded_at
+
+5. FACILITIES (50 rows)
+   - PK: facility_id
+   - facility_name, facility_type, city, state, latitude, longitude,
+     dock_doors, operating_hours, loaded_at
+
+6. ROUTES (58 rows)
+   - PK: route_id
+   - origin_city, origin_state, destination_city, destination_state,
+     typical_distance_miles, base_rate_per_mile, fuel_surcharge_rate,
+     typical_transit_days, loaded_at
+
+7. LOADS (85,410 rows)
+   - PK: load_id
+   - FKs: customer_id -> customers.customer_id,
+          route_id    -> routes.route_id
+   - load_date, load_type, weight_lbs, pieces, revenue,
+     fuel_surcharge, accessorial_charges, load_status,
+     booking_type, loaded_at
+
+8. TRIPS (85,410 rows)
+   - PK: trip_id
+   - FKs: load_id    -> loads.load_id,
+          driver_id  -> drivers.driver_id,
+          truck_id   -> trucks.truck_id,
+          trailer_id -> trailers.trailer_id
+   - dispatch_date, actual_distance_miles, actual_duration_hours,
+     fuel_gallons_used, average_mpg, idle_time_hours,
+     trip_status, loaded_at
+
+9. FUEL_PURCHASES (196,442 rows)
+   - PK: fuel_purchase_id
+   - FKs: trip_id   -> trips.trip_id,
+          truck_id  -> trucks.truck_id,
+          driver_id -> drivers.driver_id
+   - purchase_date, location_city, location_state, gallons,
+     price_per_gallon, total_cost, fuel_card_number, loaded_at
+
+------------------------------------------------------------------------
+MONGODB: fleet_operations
+------------------------------------------------------------------------
+
+Documents are raw CSV rows (all values stored as strings) plus
+MongoDB's generated `_id` (ObjectId) and the `loaded_at` field.
+
+1. delivery_events (170,820 docs)
+   - event_id (unique business key)
+   - load_id, trip_id  -> reference MySQL loads / trips
+   - facility_id       -> reference MySQL facilities
+   - event_type, scheduled_datetime, actual_datetime,
+     detention_minutes, on_time_flag, location_city,
+     location_state, loaded_at
+
+2. maintenance_records (2,920 docs)
+   - maintenance_id (unique business key)
+   - truck_id          -> reference MySQL trucks
+   - maintenance_date, maintenance_type, odometer_reading,
+     labor_hours, labor_cost, parts_cost, total_cost,
+     facility_location, downtime_hours, service_description,
+     loaded_at
+
+3. safety_incidents (170 docs)
+   - incident_id (unique business key)
+   - trip_id, truck_id, driver_id -> reference MySQL trips / trucks / drivers
+   - incident_date, incident_type, location_city, location_state,
+     at_fault_flag, injury_flag, vehicle_damage_cost,
+     cargo_damage_cost, claim_amount, preventable_flag,
+     description, loaded_at
+
+------------------------------------------------------------------------
+KEY RELATIONSHIPS
+------------------------------------------------------------------------
+- loads       -> customers (many-to-one)
+- loads       -> routes (many-to-one)
+- trips       -> loads (one-to-one)
+- trips       -> drivers / trucks / trailers (many-to-one)
+- fuel_purchases -> trips (many-to-one)
+- mongo delivery_events    -> loads, trips, facilities
+- mongo maintenance_records -> trucks
+- mongo safety_incidents   -> trips, trucks, drivers
+
+Note: foreign keys are logical only (no FK constraints are declared
+in MySQL); cross-store joins are done in application code.
+
+------------------------------------------------------------------------
+ANALYTICAL USE CASES
+------------------------------------------------------------------------
+1. Driver performance: On-time rates, MPG, revenue per mile
+2. Route profitability: Revenue vs costs per lane
+3. Fleet utilization: Miles per truck, revenue per asset
+4. Maintenance analysis: Cost per mile, downtime impact
+5. Fuel efficiency: MPG trends, fuel cost per route
+6. Customer analysis: Revenue by customer, service levels
+7. Safety metrics: Incident rates, preventable accidents
+8. Seasonal patterns: Load volume, rate fluctuations

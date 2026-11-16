@@ -1,0 +1,33 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# dbt
+dbt/fleet/target/
+dbt/serving/target/
+dbt/fleet/dbt_packages/
+dbt/serving/dbt_packages/
+dbt/fleet/logs/
+dbt/serving/logs/
+
+# Project artifacts
+out/
+prod-state/
+*.log
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
