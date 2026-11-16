@@ -11,7 +11,8 @@ PY         := $(UV) run python
         sync serve-build serve-test lint-fast lint-sql docs docs-static \
         daily weekly deploy-prod \
         notebooks notebooks-build notebooks-lab \
-        contracts-build contracts-check
+        contracts-build contracts-check \
+        ingest py-test
 
 help:            ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -94,3 +95,9 @@ contracts-build: ## Regenerate contracts/sources/*.yml + contracts/samples/*.jso
 
 contracts-check: ## Validate contracts, samples and raw CSVs for drift
 	$(PY) scripts/check_source_contracts.py
+
+ingest:          ## Run dlt ingestion (SOURCE_MODE=live|csv|fixture)
+	$(PY) -m ingestion $(INGEST_ARGS)
+
+py-test:         ## Python unit tests with coverage on ingestion
+	$(UV) run pytest tests/unit -m unit --cov=ingestion --cov-report=term-missing --cov-fail-under=80

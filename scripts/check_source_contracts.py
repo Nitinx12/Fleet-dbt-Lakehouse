@@ -57,14 +57,14 @@ def check_contract(path: Path) -> None:
 
     # system split
     if name.startswith("mysql__"):
-        system, table = "mysql", name.removeprefix("mysql__")
+        table = name.removeprefix("mysql__")
         csv_path = DATA["mysql"] / f"{table}.csv"
         if doc["source"] != f"mysql.fleet_registry.{table}":
             fail(f"{name}: source={doc['source']!r} expected mysql.fleet_registry.{table}")
         if doc["landing_table"] != f"raw.mysql__{table}":
             fail(f"{name}: landing_table={doc['landing_table']!r}")
     elif name.startswith("mongo__"):
-        system, table = "mongo", name.removeprefix("mongo__")
+        table = name.removeprefix("mongo__")
         csv_path = DATA["mongo"] / f"{table}.csv"
         if doc["source"] != f"mongodb.fleet_operations.{table}":
             fail(f"{name}: source={doc['source']!r} expected mongodb.fleet_operations.{table}")
@@ -86,7 +86,10 @@ def check_contract(path: Path) -> None:
     if set(contract_cols) != set(csv_cols):
         only_contract = set(contract_cols) - set(csv_cols)
         only_csv = set(csv_cols) - set(contract_cols)
-        fail(f"{name}: column drift contract-only={only_contract or '{}'} csv-only={only_csv or '{}'}")
+        fail(
+            f"{name}: column drift contract-only={only_contract or '{}'} "
+            f"csv-only={only_csv or '{}'}"
+        )
 
     # primary key present + not nullable
     pk = doc["primary_key"]

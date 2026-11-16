@@ -1,0 +1,4 @@
+event_id,load_id,trip_id,event_type,facility_id,scheduled_datetime,actual_datetime,detention_minutes,on_time_flag,location_city,location_state,loaded_at
+E1,L1,T1,delivered,F1,2026-11-10T08:00:00,2026-11-10T09:00:00,60,true,Houston,TX,2026-11-10T09:00:00
+E2,L2,T2,loaded,F2,2026-11-14T10:00:00,,0,false,Dallas,TX,2026-11-14T10:00:00
+E3,L3,T1,delivered,F1,2026-10-01T07:00:00,2026-10-01T08:00:00,0,true,Austin,TX,2026-10-01T08:00:00

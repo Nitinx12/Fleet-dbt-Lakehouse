@@ -1,0 +1,4 @@
+load_id,customer_id,route_id,load_date,load_type,weight_lbs,pieces,revenue,fuel_surcharge,accessorial_charges,load_status,booking_type,loaded_at
+L1,C1,R1,2026-11-10,Dry Van,1000,5,1500.00,50.00,0,Completed,Contract,2026-11-10T08:00:00
+L2,C2,R2,2026-11-14,Refrigerated,2000,10,2500.00,75.00,100,In Transit,Spot,2026-11-14T09:00:00
+L3,C3,R1,2026-10-01,Dry Van,500,2,800.00,20.00,0,Delivered,Contract,2026-10-01T07:00:00

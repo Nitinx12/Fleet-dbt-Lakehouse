@@ -32,3 +32,5 @@ prod-state/
 .DS_Store
 Thumbs.db
 dbt/.user.yml
+.coverage
+.coverage.*

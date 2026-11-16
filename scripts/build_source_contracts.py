@@ -86,17 +86,41 @@ PK = {
 
 # money / ratio columns get precision hints
 MONEY = {
-    "revenue", "fuel_surcharge", "accessorial_charges", "total_cost",
-    "labor_cost", "parts_cost", "price_per_gallon", "vehicle_damage_cost",
-    "cargo_damage_cost", "claim_amount", "base_rate_per_mile",
-    "annual_revenue_potential", "fuel_surcharge_rate",
+    "revenue",
+    "fuel_surcharge",
+    "accessorial_charges",
+    "total_cost",
+    "labor_cost",
+    "parts_cost",
+    "price_per_gallon",
+    "vehicle_damage_cost",
+    "cargo_damage_cost",
+    "claim_amount",
+    "base_rate_per_mile",
+    "annual_revenue_potential",
+    "fuel_surcharge_rate",
 }
 MIN0 = {
-    "revenue", "fuel_surcharge", "accessorial_charges", "weight_lbs", "pieces",
-    "actual_distance_miles", "fuel_gallons_used", "idle_time_hours",
-    "detention_minutes", "gallons", "total_cost", "labor_cost", "parts_cost",
-    "downtime_hours", "odometer_reading", "claim_amount", "vehicle_damage_cost",
-    "cargo_damage_cost", "years_experience", "dock_doors",
+    "revenue",
+    "fuel_surcharge",
+    "accessorial_charges",
+    "weight_lbs",
+    "pieces",
+    "actual_distance_miles",
+    "fuel_gallons_used",
+    "idle_time_hours",
+    "detention_minutes",
+    "gallons",
+    "total_cost",
+    "labor_cost",
+    "parts_cost",
+    "downtime_hours",
+    "odometer_reading",
+    "claim_amount",
+    "vehicle_damage_cost",
+    "cargo_damage_cost",
+    "years_experience",
+    "dock_doors",
 }
 
 
@@ -206,12 +230,14 @@ def build_mongo_contract(name: str, df: pd.DataFrame) -> dict:
                     dt = pd.to_datetime(probe, errors="coerce", utc=True)
                     if dt.notna().mean() > 0.95:
                         head = probe.iloc[0]
-                        staged = "timestamp" if any(ch in str(head) for ch in (":", "T")) else "date"
+                        has_time = any(ch in str(head) for ch in (":", "T"))
+                        staged = "timestamp" if has_time else "date"
                 except Exception:
                     pass
 
         # flag normalisation columns
-        if col.endswith("_flag") or col in ("on_time_flag", "at_fault_flag", "injury_flag", "preventable_flag"):
+        flag_cols = ("on_time_flag", "at_fault_flag", "injury_flag", "preventable_flag")
+        if col.endswith("_flag") or col in flag_cols:
             staged = "boolean"
             cast = "flag"
         elif staged in ("int", "bigint", "decimal(12,2)", "date", "timestamp"):
@@ -300,12 +326,15 @@ def main() -> None:
         typed = pd.read_csv(path)
         contract = build_mysql_contract(name, typed)
         yml_path = OUT_YML / f"mysql__{name}.yml"
-        yml_path.write_text(
+        header = (
             f"# Source contract: mysql.fleet_registry.{name}\n"
-            f"# Generated from data/mysql/{name}.csv — edit deliberately; breaking changes = major bump.\n"
-            + yaml.safe_dump(contract, sort_keys=False, default_flow_style=False, allow_unicode=True),
-            encoding="utf-8",
+            f"# Generated from data/mysql/{name}.csv - edit deliberately; "
+            "breaking changes = major bump.\n"
         )
+        body = yaml.safe_dump(
+            contract, sort_keys=False, default_flow_style=False, allow_unicode=True
+        )
+        yml_path.write_text(header + body, encoding="utf-8")
         samples = sample_rows(typed)
         (OUT_JSON / f"mysql__{name}.sample.json").write_text(
             json.dumps(
@@ -331,12 +360,14 @@ def main() -> None:
         df = pd.read_csv(path, dtype=str)
         contract = build_mongo_contract(name, df)
         yml_path = OUT_YML / f"mongo__{name}.yml"
-        yml_path.write_text(
+        header = (
             f"# Source contract: mongodb.fleet_operations.{name}\n"
-            f"# Raw values are strings; staged_type is produced by try_cast / flag normalisation.\n"
-            + yaml.safe_dump(contract, sort_keys=False, default_flow_style=False, allow_unicode=True),
-            encoding="utf-8",
+            "# Raw values are strings; staged_type is produced by try_cast / flag normalisation.\n"
         )
+        body = yaml.safe_dump(
+            contract, sort_keys=False, default_flow_style=False, allow_unicode=True
+        )
+        yml_path.write_text(header + body, encoding="utf-8")
         # sample rows: show raw strings + a cast preview
         raw_samples = sample_rows(df)
         cast_preview = []
@@ -372,7 +403,10 @@ def main() -> None:
                     "landing_table": contract["landing_table"],
                     "primary_key": contract["primary_key"],
                     "row_count_baseline": contract["quality"]["row_count"]["baseline"],
-                    "note": "raw_values are strings as stored in MongoDB; staged_preview shows try_cast result",
+                    "note": (
+                        "raw_values are strings as stored in MongoDB; "
+                        "staged_preview shows try_cast result"
+                    ),
                     "sample_rows_raw": raw_samples,
                     "sample_rows_staged_preview": cast_preview,
                 },
@@ -386,7 +420,8 @@ def main() -> None:
         print(f"  {yml_path.name} ({len(df)} rows, {len(contract['columns'])} cols)")
 
     (ROOT / "contracts" / "sources_index.json").write_text(
-        json.dumps({"generated_from": "data/{mysql,mongo}/*.csv", "contracts": index}, indent=2) + "\n",
+        json.dumps({"generated_from": "data/{mysql,mongo}/*.csv", "contracts": index}, indent=2)
+        + "\n",
         encoding="utf-8",
     )
     print(f"\n{len(index)} contracts -> {OUT_YML}")
