@@ -18,6 +18,10 @@ def run(path: Path) -> None:
         resources={"metadata": {"path": str(ROOT)}},
     )
     client.execute()
+    # Wall-clock stamps in cell metadata change every run — drop them so
+    # re-executing with the same inputs leaves the file byte-identical.
+    for cell in nb.cells:
+        cell.get("metadata", {}).pop("execution", None)
     nbformat.write(nb, path)
     print(f"  ok — {len(nb.cells)} cells")
 
