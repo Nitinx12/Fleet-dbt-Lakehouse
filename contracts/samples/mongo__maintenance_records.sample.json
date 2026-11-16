@@ -1,0 +1,89 @@
+{
+  "contract": "mongo__maintenance_records.yml",
+  "source": "mongodb.fleet_operations.maintenance_records",
+  "landing_table": "raw.mongo__maintenance_records",
+  "primary_key": [
+    "maintenance_id"
+  ],
+  "row_count_baseline": 2920,
+  "note": "raw_values are strings as stored in MongoDB; staged_preview shows try_cast result",
+  "sample_rows_raw": [
+    {
+      "maintenance_id": "MAINT00000001",
+      "truck_id": "TRK00085",
+      "maintenance_date": "2022-01-01",
+      "maintenance_type": "Inspection",
+      "odometer_reading": "400255",
+      "labor_hours": "7.8",
+      "labor_cost": "781.42",
+      "parts_cost": "10.41",
+      "total_cost": "791.83",
+      "facility_location": "Kansas City",
+      "downtime_hours": "22.2",
+      "service_description": "Emergency Inspection",
+      "loaded_at": "2026-11-16T06:24:26.332985+00:00"
+    },
+    {
+      "maintenance_id": "MAINT00000002",
+      "truck_id": "TRK00041",
+      "maintenance_date": "2022-01-01",
+      "maintenance_type": "Tire",
+      "odometer_reading": "268041",
+      "labor_hours": "0.9",
+      "labor_cost": "80.91",
+      "parts_cost": "3207.16",
+      "total_cost": "3288.07",
+      "facility_location": "Seattle",
+      "downtime_hours": "8.0",
+      "service_description": "Scheduled Tire",
+      "loaded_at": "2026-11-16T06:24:26.332985+00:00"
+    },
+    {
+      "maintenance_id": "MAINT00000003",
+      "truck_id": "TRK00090",
+      "maintenance_date": "2022-01-01",
+      "maintenance_type": "Preventive",
+      "odometer_reading": "698915",
+      "labor_hours": "7.2",
+      "labor_cost": "733.18",
+      "parts_cost": "1570.57",
+      "total_cost": "2303.75",
+      "facility_location": "Miami",
+      "downtime_hours": "16.5",
+      "service_description": "Routine Preventive",
+      "loaded_at": "2026-11-16T06:24:26.332985+00:00"
+    }
+  ],
+  "sample_rows_staged_preview": [
+    {
+      "maintenance_id": "MAINT00000001",
+      "truck_id": "TRK00085",
+      "maintenance_date": "2022-01-01",
+      "maintenance_type": "Inspection",
+      "odometer_reading": 400255,
+      "labor_hours": 7.8,
+      "labor_cost": 781.42,
+      "parts_cost": 10.41,
+      "total_cost": 791.83,
+      "facility_location": "Kansas City",
+      "downtime_hours": 22.2,
+      "service_description": "Emergency Inspection",
+      "loaded_at": "2026-11-16T06:24:26.332985+00:00"
+    },
+    {
+      "maintenance_id": "MAINT00000002",
+      "truck_id": "TRK00041",
+      "maintenance_date": "2022-01-01",
+      "maintenance_type": "Tire",
+      "odometer_reading": 268041,
+      "labor_hours": 0.9,
+      "labor_cost": 80.91,
+      "parts_cost": 3207.16,
+      "total_cost": 3288.07,
+      "facility_location": "Seattle",
+      "downtime_hours": 8.0,
+      "service_description": "Scheduled Tire",
+      "loaded_at": "2026-11-16T06:24:26.332985+00:00"
+    }
+  ]
+}

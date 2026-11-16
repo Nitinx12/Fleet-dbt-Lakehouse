@@ -1,0 +1,65 @@
+{
+  "generated_from": "data/{mysql,mongo}/*.csv",
+  "contracts": [
+    {
+      "file": "mysql__customers.yml",
+      "source": "mysql.fleet_registry.customers",
+      "rows": 200
+    },
+    {
+      "file": "mysql__drivers.yml",
+      "source": "mysql.fleet_registry.drivers",
+      "rows": 150
+    },
+    {
+      "file": "mysql__facilities.yml",
+      "source": "mysql.fleet_registry.facilities",
+      "rows": 50
+    },
+    {
+      "file": "mysql__fuel_purchases.yml",
+      "source": "mysql.fleet_registry.fuel_purchases",
+      "rows": 196442
+    },
+    {
+      "file": "mysql__loads.yml",
+      "source": "mysql.fleet_registry.loads",
+      "rows": 85410
+    },
+    {
+      "file": "mysql__routes.yml",
+      "source": "mysql.fleet_registry.routes",
+      "rows": 58
+    },
+    {
+      "file": "mysql__trailers.yml",
+      "source": "mysql.fleet_registry.trailers",
+      "rows": 180
+    },
+    {
+      "file": "mysql__trips.yml",
+      "source": "mysql.fleet_registry.trips",
+      "rows": 85410
+    },
+    {
+      "file": "mysql__trucks.yml",
+      "source": "mysql.fleet_registry.trucks",
+      "rows": 120
+    },
+    {
+      "file": "mongo__delivery_events.yml",
+      "source": "mongodb.fleet_operations.delivery_events",
+      "rows": 170820
+    },
+    {
+      "file": "mongo__maintenance_records.yml",
+      "source": "mongodb.fleet_operations.maintenance_records",
+      "rows": 2920
+    },
+    {
+      "file": "mongo__safety_incidents.yml",
+      "source": "mongodb.fleet_operations.safety_incidents",
+      "rows": 170
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "contract": "mysql__trucks.yml",
+  "source": "mysql.fleet_registry.trucks",
+  "landing_table": "raw.mysql__trucks",
+  "primary_key": [
+    "truck_id"
+  ],
+  "row_count_baseline": 120,
+  "sample_rows": [
+    {
+      "truck_id": "TRK00001",
+      "unit_number": 3463,
+      "make": "Peterbilt",
+      "model_year": 2016,
+      "vin": "1VV205190335317039",
+      "acquisition_date": "2017-04-27",
+      "acquisition_mileage": 18814,
+      "fuel_type": "Diesel",
+      "tank_capacity_gallons": 200,
+      "status": "Active",
+      "home_terminal": "Omaha",
+      "loaded_at": "2026-11-16T06:24:28.080580+00:00"
+    },
+    {
+      "truck_id": "TRK00002",
+      "unit_number": 6461,
+      "make": "Kenworth",
+      "model_year": 2015,
+      "vin": "1NV753749606229960",
+      "acquisition_date": "2018-10-04",
+      "acquisition_mileage": 26795,
+      "fuel_type": "Diesel",
+      "tank_capacity_gallons": 150,
+      "status": "Active",
+      "home_terminal": "Seattle",
+      "loaded_at": "2026-11-16T06:24:28.080580+00:00"
+    },
+    {
+      "truck_id": "TRK00003",
+      "unit_number": 2335,
+      "make": "Peterbilt",
+      "model_year": 2018,
+      "vin": "1NT803101860493229",
+      "acquisition_date": "2020-09-17",
+      "acquisition_mileage": 11795,
+      "fuel_type": "Diesel",
+      "tank_capacity_gallons": 150,
+      "status": "Maintenance",
+      "home_terminal": "Atlanta",
+      "loaded_at": "2026-11-16T06:24:28.080580+00:00"
+    }
+  ]
+}

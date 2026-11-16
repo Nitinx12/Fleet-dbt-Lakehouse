@@ -1,0 +1,56 @@
+# Source contract: mysql.fleet_registry.customers
+# Generated from data/mysql/customers.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.customers
+landing_table: raw.mysql__customers
+owner: fleet-data-eng
+primary_key:
+- customer_id
+extraction:
+  mode: full_replace
+columns:
+- name: customer_id
+  type: string
+  nullable: false
+- name: customer_name
+  type: string
+  nullable: false
+- name: customer_type
+  type: string
+  nullable: false
+  accepted_values:
+  - Contract
+  - Spot
+  - Dedicated
+- name: credit_terms_days
+  type: int
+  nullable: false
+- name: primary_freight_type
+  type: string
+  nullable: false
+- name: account_status
+  type: string
+  nullable: false
+  accepted_values:
+  - Active
+  - Inactive
+- name: contract_start_date
+  type: date
+  nullable: false
+- name: annual_revenue_potential
+  type: int
+  nullable: false
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 200
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

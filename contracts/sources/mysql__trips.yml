@@ -1,0 +1,75 @@
+# Source contract: mysql.fleet_registry.trips
+# Generated from data/mysql/trips.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.trips
+landing_table: raw.mysql__trips
+owner: fleet-data-eng
+primary_key:
+- trip_id
+extraction:
+  mode: incremental
+  cursor: dispatch_date
+  lookback_days: 14
+columns:
+- name: trip_id
+  type: string
+  nullable: false
+- name: load_id
+  type: string
+  nullable: false
+  references: loads.load_id
+- name: driver_id
+  type: string
+  nullable: true
+  references: drivers.driver_id
+- name: truck_id
+  type: string
+  nullable: true
+  references: trucks.truck_id
+- name: trailer_id
+  type: string
+  nullable: true
+  references: trailers.trailer_id
+- name: dispatch_date
+  type: date
+  nullable: false
+- name: actual_distance_miles
+  type: int
+  nullable: false
+  min: 0
+- name: actual_duration_hours
+  type: decimal(10,4)
+  nullable: false
+- name: fuel_gallons_used
+  type: decimal(10,4)
+  nullable: false
+  min: 0
+- name: average_mpg
+  type: decimal(10,4)
+  nullable: false
+- name: idle_time_hours
+  type: decimal(10,4)
+  nullable: false
+  min: 0
+- name: trip_status
+  type: string
+  nullable: false
+  accepted_values:
+  - Completed
+  - In Transit
+  - Planned
+  - Cancelled
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 85410
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

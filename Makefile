@@ -10,7 +10,8 @@ PY         := $(UV) run python
 .PHONY: help setup up down deps parse build unit freshness ci-build \
         sync serve-build serve-test lint-fast lint-sql docs docs-static \
         daily weekly deploy-prod \
-        notebooks notebooks-build notebooks-lab
+        notebooks notebooks-build notebooks-lab \
+        contracts-build contracts-check
 
 help:            ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -87,3 +88,9 @@ notebooks-build: ## Regenerate EDA notebook skeletons (clears outputs)
 
 notebooks-lab:   ## Open JupyterLab on notebooks/
 	$(UV) run jupyter lab notebooks/
+
+contracts-build: ## Regenerate contracts/sources/*.yml + contracts/samples/*.json from raw CSVs
+	$(PY) scripts/build_source_contracts.py
+
+contracts-check: ## Validate contracts, samples and raw CSVs for drift
+	$(PY) scripts/check_source_contracts.py

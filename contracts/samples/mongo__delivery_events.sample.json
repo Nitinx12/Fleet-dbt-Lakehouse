@@ -1,0 +1,84 @@
+{
+  "contract": "mongo__delivery_events.yml",
+  "source": "mongodb.fleet_operations.delivery_events",
+  "landing_table": "raw.mongo__delivery_events",
+  "primary_key": [
+    "event_id"
+  ],
+  "row_count_baseline": 170820,
+  "note": "raw_values are strings as stored in MongoDB; staged_preview shows try_cast result",
+  "sample_rows_raw": [
+    {
+      "event_id": "EVT00000001",
+      "load_id": "LOAD00000001",
+      "trip_id": "TRIP00000001",
+      "event_type": "Pickup",
+      "facility_id": "FAC00034",
+      "scheduled_datetime": "2022-01-01 18:00:00.000000",
+      "actual_datetime": "2022-01-01 20:58:55.918185",
+      "detention_minutes": "0",
+      "on_time_flag": "False",
+      "location_city": "Houston",
+      "location_state": "TX",
+      "loaded_at": "2026-11-16T06:24:25.384993+00:00"
+    },
+    {
+      "event_id": "EVT00000002",
+      "load_id": "LOAD00000001",
+      "trip_id": "TRIP00000001",
+      "event_type": "Delivery",
+      "facility_id": "FAC00046",
+      "scheduled_datetime": "2022-01-02 23:10:55.918185",
+      "actual_datetime": "2022-01-02 21:30:22.142060",
+      "detention_minutes": "230",
+      "on_time_flag": "True",
+      "location_city": "Detroit",
+      "location_state": "MI",
+      "loaded_at": "2026-11-16T06:24:25.384993+00:00"
+    },
+    {
+      "event_id": "EVT00000003",
+      "load_id": "LOAD00000002",
+      "trip_id": "TRIP00000002",
+      "event_type": "Pickup",
+      "facility_id": "FAC00015",
+      "scheduled_datetime": "2022-01-01 18:00:00.000000",
+      "actual_datetime": "2022-01-01 17:37:26.608430",
+      "detention_minutes": "62",
+      "on_time_flag": "True",
+      "location_city": "Kansas City",
+      "location_state": "MO",
+      "loaded_at": "2026-11-16T06:24:25.384993+00:00"
+    }
+  ],
+  "sample_rows_staged_preview": [
+    {
+      "event_id": "EVT00000001",
+      "load_id": "LOAD00000001",
+      "trip_id": "TRIP00000001",
+      "event_type": "Pickup",
+      "facility_id": "FAC00034",
+      "scheduled_datetime": "2022-01-01 18:00:00.000000",
+      "actual_datetime": "2022-01-01 20:58:55.918185",
+      "detention_minutes": 0,
+      "on_time_flag": false,
+      "location_city": "Houston",
+      "location_state": "TX",
+      "loaded_at": "2026-11-16T06:24:25.384993+00:00"
+    },
+    {
+      "event_id": "EVT00000002",
+      "load_id": "LOAD00000001",
+      "trip_id": "TRIP00000001",
+      "event_type": "Delivery",
+      "facility_id": "FAC00046",
+      "scheduled_datetime": "2022-01-02 23:10:55.918185",
+      "actual_datetime": "2022-01-02 21:30:22.142060",
+      "detention_minutes": 230,
+      "on_time_flag": true,
+      "location_city": "Detroit",
+      "location_state": "MI",
+      "loaded_at": "2026-11-16T06:24:25.384993+00:00"
+    }
+  ]
+}

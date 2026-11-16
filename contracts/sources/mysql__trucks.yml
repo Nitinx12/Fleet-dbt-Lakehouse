@@ -1,0 +1,62 @@
+# Source contract: mysql.fleet_registry.trucks
+# Generated from data/mysql/trucks.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.trucks
+landing_table: raw.mysql__trucks
+owner: fleet-data-eng
+primary_key:
+- truck_id
+extraction:
+  mode: full_replace
+columns:
+- name: truck_id
+  type: string
+  nullable: false
+- name: unit_number
+  type: int
+  nullable: false
+- name: make
+  type: string
+  nullable: false
+- name: model_year
+  type: int
+  nullable: false
+- name: vin
+  type: string
+  nullable: false
+- name: acquisition_date
+  type: date
+  nullable: false
+- name: acquisition_mileage
+  type: int
+  nullable: false
+- name: fuel_type
+  type: string
+  nullable: false
+- name: tank_capacity_gallons
+  type: int
+  nullable: false
+- name: status
+  type: string
+  nullable: false
+  accepted_values:
+  - Active
+  - Maintenance
+  - Inactive
+- name: home_terminal
+  type: string
+  nullable: false
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 120
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

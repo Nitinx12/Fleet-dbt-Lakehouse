@@ -1,0 +1,66 @@
+# Source contract: mysql.fleet_registry.fuel_purchases
+# Generated from data/mysql/fuel_purchases.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.fuel_purchases
+landing_table: raw.mysql__fuel_purchases
+owner: fleet-data-eng
+primary_key:
+- fuel_purchase_id
+extraction:
+  mode: incremental
+  cursor: purchase_date
+  lookback_days: 14
+columns:
+- name: fuel_purchase_id
+  type: string
+  nullable: false
+- name: trip_id
+  type: string
+  nullable: false
+  references: trips.trip_id
+- name: truck_id
+  type: string
+  nullable: true
+  references: trucks.truck_id
+- name: driver_id
+  type: string
+  nullable: true
+  references: drivers.driver_id
+- name: purchase_date
+  type: timestamp
+  nullable: false
+- name: location_city
+  type: string
+  nullable: false
+- name: location_state
+  type: string
+  nullable: false
+- name: gallons
+  type: decimal(10,4)
+  nullable: false
+  min: 0
+- name: price_per_gallon
+  type: decimal(10,4)
+  nullable: false
+  min: 0
+- name: total_cost
+  type: decimal(10,4)
+  nullable: false
+  min: 0
+- name: fuel_card_number
+  type: string
+  nullable: false
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 196442
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

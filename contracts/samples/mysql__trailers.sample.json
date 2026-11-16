@@ -1,0 +1,47 @@
+{
+  "contract": "mysql__trailers.yml",
+  "source": "mysql.fleet_registry.trailers",
+  "landing_table": "raw.mysql__trailers",
+  "primary_key": [
+    "trailer_id"
+  ],
+  "row_count_baseline": 180,
+  "sample_rows": [
+    {
+      "trailer_id": "TRL00001",
+      "trailer_number": 4290,
+      "trailer_type": "Refrigerated",
+      "length_feet": 53,
+      "model_year": 2016,
+      "vin": "1AV889081755621178",
+      "acquisition_date": "2018-05-11",
+      "status": "Active",
+      "current_location": "Kansas City",
+      "loaded_at": "2026-11-16T06:24:27.707090+00:00"
+    },
+    {
+      "trailer_id": "TRL00002",
+      "trailer_number": 8848,
+      "trailer_type": "Dry Van",
+      "length_feet": 53,
+      "model_year": 2018,
+      "vin": "1BU942062588832828",
+      "acquisition_date": "2018-11-24",
+      "status": "Active",
+      "current_location": "Kansas City",
+      "loaded_at": "2026-11-16T06:24:27.707090+00:00"
+    },
+    {
+      "trailer_id": "TRL00003",
+      "trailer_number": 6147,
+      "trailer_type": "Dry Van",
+      "length_feet": 53,
+      "model_year": 2022,
+      "vin": "1AV669057807416326",
+      "acquisition_date": "2019-01-28",
+      "status": "Active",
+      "current_location": "Milwaukee",
+      "loaded_at": "2026-11-16T06:24:27.707090+00:00"
+    }
+  ]
+}

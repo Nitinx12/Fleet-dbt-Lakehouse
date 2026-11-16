@@ -1,0 +1,54 @@
+# Source contract: mysql.fleet_registry.routes
+# Generated from data/mysql/routes.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.routes
+landing_table: raw.mysql__routes
+owner: fleet-data-eng
+primary_key:
+- route_id
+extraction:
+  mode: full_replace
+columns:
+- name: route_id
+  type: string
+  nullable: false
+- name: origin_city
+  type: string
+  nullable: false
+- name: origin_state
+  type: string
+  nullable: false
+- name: destination_city
+  type: string
+  nullable: false
+- name: destination_state
+  type: string
+  nullable: false
+- name: typical_distance_miles
+  type: int
+  nullable: false
+- name: base_rate_per_mile
+  type: decimal(10,4)
+  nullable: false
+  min: 0
+- name: fuel_surcharge_rate
+  type: decimal(10,4)
+  nullable: false
+  min: 0
+- name: typical_transit_days
+  type: int
+  nullable: false
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 58
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

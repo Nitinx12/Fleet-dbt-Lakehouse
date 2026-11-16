@@ -1,0 +1,56 @@
+{
+  "contract": "mysql__loads.yml",
+  "source": "mysql.fleet_registry.loads",
+  "landing_table": "raw.mysql__loads",
+  "primary_key": [
+    "load_id"
+  ],
+  "row_count_baseline": 85410,
+  "sample_rows": [
+    {
+      "load_id": "LOAD00000001",
+      "customer_id": "CUST00183",
+      "route_id": "RTE00019",
+      "load_date": "2022-01-01",
+      "load_type": "Dry Van",
+      "weight_lbs": 19178,
+      "pieces": 13,
+      "revenue": 3045.23,
+      "fuel_surcharge": 406.72,
+      "accessorial_charges": 100,
+      "load_status": "Completed",
+      "booking_type": "Spot",
+      "loaded_at": "2026-11-16T06:24:27.300732+00:00"
+    },
+    {
+      "load_id": "LOAD00000002",
+      "customer_id": "CUST00076",
+      "route_id": "RTE00058",
+      "load_date": "2022-01-01",
+      "load_type": "Dry Van",
+      "weight_lbs": 27761,
+      "pieces": 22,
+      "revenue": 1224.48,
+      "fuel_surcharge": 98.61,
+      "accessorial_charges": 0,
+      "load_status": "Completed",
+      "booking_type": "Dedicated",
+      "loaded_at": "2026-11-16T06:24:27.300732+00:00"
+    },
+    {
+      "load_id": "LOAD00000003",
+      "customer_id": "CUST00027",
+      "route_id": "RTE00048",
+      "load_date": "2022-01-01",
+      "load_type": "Refrigerated",
+      "weight_lbs": 35594,
+      "pieces": 16,
+      "revenue": 7171.12,
+      "fuel_surcharge": 792.88,
+      "accessorial_charges": 0,
+      "load_status": "Completed",
+      "booking_type": "Spot",
+      "loaded_at": "2026-11-16T06:24:27.300732+00:00"
+    }
+  ]
+}
