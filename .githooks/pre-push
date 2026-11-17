@@ -20,7 +20,7 @@ if [ -z "$PY" ]; then
 fi
 
 # 1. Everything under src/ and scripts/ must compile
-"$PY" -m compileall -q src scripts
+"$PY" -m compileall -q utils scripts tests
 
 # 2. All data contracts must be valid JSON
 "$PY" - <<'PY'
