@@ -1,0 +1,16 @@
+name: fleet_dbt
+version: "1.0.0"
+config-version: 2
+profile: fleet_dbt
+
+models:
+  fleet_dbt:
+    silver:
+      +schema: silver
+      +materialized: table
+    gold:
+      +schema: gold
+      +materialized: table
+
+vars:
+  silver_lookback_hours: 24

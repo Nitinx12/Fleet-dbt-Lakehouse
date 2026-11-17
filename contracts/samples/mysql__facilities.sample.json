@@ -1,0 +1,47 @@
+{
+  "contract": "mysql__facilities.yml",
+  "source": "mysql.fleet_registry.facilities",
+  "landing_table": "bronze.mysql__facilities",
+  "primary_key": [
+    "facility_id"
+  ],
+  "row_count_baseline": 50,
+  "sample_rows": [
+    {
+      "facility_id": "FAC00001",
+      "facility_name": "Houston Distribution Center",
+      "facility_type": "Cross-Dock",
+      "city": "Houston",
+      "state": "TX",
+      "latitude": 29.7604,
+      "longitude": -95.3698,
+      "dock_doors": 125,
+      "operating_hours": "24/7",
+      "loaded_at": "2026-11-16T06:24:26.386929+00:00"
+    },
+    {
+      "facility_id": "FAC00002",
+      "facility_name": "Kansas City Hub",
+      "facility_type": "Cross-Dock",
+      "city": "Kansas City",
+      "state": "MO",
+      "latitude": 39.0997,
+      "longitude": -94.5786,
+      "dock_doors": 33,
+      "operating_hours": "7AM-7PM",
+      "loaded_at": "2026-11-16T06:24:26.386929+00:00"
+    },
+    {
+      "facility_id": "FAC00003",
+      "facility_name": "Charlotte Distribution Center",
+      "facility_type": "Distribution Center",
+      "city": "Charlotte",
+      "state": "NC",
+      "latitude": 35.2271,
+      "longitude": -80.8431,
+      "dock_doors": 138,
+      "operating_hours": "24/7",
+      "loaded_at": "2026-11-16T06:24:26.386929+00:00"
+    }
+  ]
+}

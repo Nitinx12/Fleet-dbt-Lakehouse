@@ -1,0 +1,56 @@
+{
+  "contract": "mysql__trips.yml",
+  "source": "mysql.fleet_registry.trips",
+  "landing_table": "bronze.mysql__trips",
+  "primary_key": [
+    "trip_id"
+  ],
+  "row_count_baseline": 85410,
+  "sample_rows": [
+    {
+      "trip_id": "TRIP00000001",
+      "load_id": "LOAD00000001",
+      "driver_id": "DRV00117",
+      "truck_id": "TRK00035",
+      "trailer_id": "TRL00167",
+      "dispatch_date": "2022-01-01",
+      "actual_distance_miles": 1314,
+      "actual_duration_hours": 26.2,
+      "fuel_gallons_used": 183.8,
+      "average_mpg": 7.15,
+      "idle_time_hours": 3.5,
+      "trip_status": "Completed",
+      "loaded_at": "2026-11-16T06:24:27.719013+00:00"
+    },
+    {
+      "trip_id": "TRIP00000002",
+      "load_id": "LOAD00000002",
+      "driver_id": "DRV00141",
+      "truck_id": "TRK00108",
+      "trailer_id": "TRL00082",
+      "dispatch_date": "2022-01-01",
+      "actual_distance_miles": 515,
+      "actual_duration_hours": 8.6,
+      "fuel_gallons_used": 93.6,
+      "average_mpg": 5.5,
+      "idle_time_hours": 8.3,
+      "trip_status": "Completed",
+      "loaded_at": "2026-11-16T06:24:27.719013+00:00"
+    },
+    {
+      "trip_id": "TRIP00000003",
+      "load_id": "LOAD00000003",
+      "driver_id": "DRV00032",
+      "truck_id": "TRK00031",
+      "trailer_id": "TRL00138",
+      "dispatch_date": "2022-01-01",
+      "actual_distance_miles": 2509,
+      "actual_duration_hours": 45.0,
+      "fuel_gallons_used": 339.1,
+      "average_mpg": 7.4,
+      "idle_time_hours": 12.0,
+      "trip_status": "Completed",
+      "loaded_at": "2026-11-16T06:24:27.719013+00:00"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+[project]
+name = "fleet-dbt-warehouse"
+version = "0.1.0"
+description = "Daily fleet pipeline: MySQL/MongoDB -> Postgres bronze -> dbt -> Databricks marts"
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=50.0.2",
+    "databricks-sql-connector[pyarrow]>=4.6",
+    "dbt-core>=1.12.7",
+    "dbt-postgres>=1.11.0",
+    "psycopg2-binary>=2.9",
+    "pymongo>=4.18",
+    "pymysql>=1.2.4",
+    "python-dotenv>=1.2",
+    "sqlalchemy>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "ruff>=0.16",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["notebooks"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "unit: fast, isolated, no I/O",
+    "integration: needs a real service",
+    "contract: contract drift checks",
+    "smoke: end-to-end fixture pipeline",
+    "smoke_prod: read-only checks against production",
+]

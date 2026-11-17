@@ -1,0 +1,101 @@
+# Source contract: mongodb.fleet_operations.safety_incidents
+# Raw values are strings; staged_type is produced by try_cast / flag normalisation.
+contract_version: 1.0.0
+source: mongodb.fleet_operations.safety_incidents
+landing_table: bronze.mongo__safety_incidents
+owner: fleet-data-eng
+primary_key:
+- incident_id
+extraction:
+  mode: full_replace
+columns:
+- name: incident_id
+  raw_type: string
+  staged_type: string
+  nullable: false
+- name: trip_id
+  raw_type: string
+  staged_type: string
+  nullable: false
+  references: mysql.fleet_registry.trips.trip_id
+- name: truck_id
+  raw_type: string
+  staged_type: string
+  nullable: true
+  references: mysql.fleet_registry.trucks.truck_id
+- name: driver_id
+  raw_type: string
+  staged_type: string
+  nullable: true
+  references: mysql.fleet_registry.drivers.driver_id
+- name: incident_date
+  raw_type: string
+  staged_type: timestamp
+  nullable: false
+  cast: try_cast
+- name: incident_type
+  raw_type: string
+  staged_type: string
+  nullable: false
+- name: location_city
+  raw_type: string
+  staged_type: string
+  nullable: false
+- name: location_state
+  raw_type: string
+  staged_type: string
+  nullable: false
+- name: at_fault_flag
+  raw_type: string
+  staged_type: boolean
+  nullable: false
+  cast: flag
+- name: injury_flag
+  raw_type: string
+  staged_type: boolean
+  nullable: false
+  cast: flag
+- name: vehicle_damage_cost
+  raw_type: string
+  staged_type: decimal(12,2)
+  nullable: false
+  cast: try_cast
+  min: 0
+- name: cargo_damage_cost
+  raw_type: string
+  staged_type: decimal(12,2)
+  nullable: false
+  cast: try_cast
+  min: 0
+- name: claim_amount
+  raw_type: string
+  staged_type: decimal(12,2)
+  nullable: false
+  cast: try_cast
+  min: 0
+- name: preventable_flag
+  raw_type: string
+  staged_type: boolean
+  nullable: false
+  cast: flag
+- name: description
+  raw_type: string
+  staged_type: string
+  nullable: false
+- name: loaded_at
+  raw_type: string
+  staged_type: timestamp
+  nullable: false
+  cast: try_cast
+quality:
+  row_count:
+    baseline: 170
+    tolerance_pct: 5
+  max_cast_failure_pct: 0.1
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

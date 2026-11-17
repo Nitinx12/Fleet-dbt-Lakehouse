@@ -1,0 +1,85 @@
+# Source contract: mysql.fleet_registry.loads
+# Generated from data/mysql/loads.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.loads
+landing_table: bronze.mysql__loads
+owner: fleet-data-eng
+primary_key:
+- load_id
+extraction:
+  mode: incremental
+  cursor: load_date
+  lookback_days: 14
+columns:
+- name: load_id
+  type: string
+  nullable: false
+- name: customer_id
+  type: string
+  nullable: false
+  references: customers.customer_id
+- name: route_id
+  type: string
+  nullable: false
+  references: routes.route_id
+- name: load_date
+  type: date
+  nullable: false
+- name: load_type
+  type: string
+  nullable: false
+  accepted_values:
+  - Dry Van
+  - Refrigerated
+  - Flatbed
+  - Tanker
+- name: weight_lbs
+  type: int
+  nullable: false
+  min: 0
+- name: pieces
+  type: int
+  nullable: false
+  min: 0
+- name: revenue
+  type: decimal(12,2)
+  nullable: false
+  min: 0
+- name: fuel_surcharge
+  type: decimal(10,4)
+  nullable: false
+  min: 0
+- name: accessorial_charges
+  type: int
+  nullable: false
+  min: 0
+- name: load_status
+  type: string
+  nullable: false
+  accepted_values:
+  - Completed
+  - In Transit
+  - Delivered
+  - Cancelled
+  - Booked
+- name: booking_type
+  type: string
+  nullable: false
+  accepted_values:
+  - Dedicated
+  - Contract
+  - Spot
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 85410
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

@@ -1,0 +1,69 @@
+# Source contract: mysql.fleet_registry.drivers
+# Generated from data/mysql/drivers.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.drivers
+landing_table: bronze.mysql__drivers
+owner: fleet-data-eng
+primary_key:
+- driver_id
+extraction:
+  mode: full_replace
+columns:
+- name: driver_id
+  type: string
+  nullable: false
+- name: first_name
+  type: string
+  nullable: false
+- name: last_name
+  type: string
+  nullable: false
+- name: hire_date
+  type: date
+  nullable: false
+- name: termination_date
+  type: date
+  nullable: true
+- name: license_number
+  type: string
+  nullable: false
+- name: license_state
+  type: string
+  nullable: false
+- name: date_of_birth
+  type: date
+  nullable: false
+- name: home_terminal
+  type: string
+  nullable: false
+- name: employment_status
+  type: string
+  nullable: false
+  accepted_values:
+  - Active
+  - Terminated
+- name: cdl_class
+  type: string
+  nullable: false
+  accepted_values:
+  - A
+  - B
+  - C
+- name: years_experience
+  type: int
+  nullable: false
+  min: 0
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 150
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

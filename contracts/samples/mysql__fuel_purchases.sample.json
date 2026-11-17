@@ -1,0 +1,53 @@
+{
+  "contract": "mysql__fuel_purchases.yml",
+  "source": "mysql.fleet_registry.fuel_purchases",
+  "landing_table": "bronze.mysql__fuel_purchases",
+  "primary_key": [
+    "fuel_purchase_id"
+  ],
+  "row_count_baseline": 196442,
+  "sample_rows": [
+    {
+      "fuel_purchase_id": "FUEL00000001",
+      "trip_id": "TRIP00051284",
+      "truck_id": "TRK00045",
+      "driver_id": "DRV00102",
+      "purchase_date": "2023-10-22 05:00:00",
+      "location_city": "Columbus",
+      "location_state": "MN",
+      "gallons": 131.6,
+      "price_per_gallon": 3.399,
+      "total_cost": 447.31,
+      "fuel_card_number": "FC567161",
+      "loaded_at": "2026-11-16T06:24:26.397126+00:00"
+    },
+    {
+      "fuel_purchase_id": "FUEL00000002",
+      "trip_id": "TRIP00073723",
+      "truck_id": "TRK00013",
+      "driver_id": null,
+      "purchase_date": "2024-08-04 08:00:00",
+      "location_city": "New York",
+      "location_state": "AZ",
+      "gallons": 139.9,
+      "price_per_gallon": 3.18,
+      "total_cost": 444.88,
+      "fuel_card_number": "FC717910",
+      "loaded_at": "2026-11-16T06:24:26.397126+00:00"
+    },
+    {
+      "fuel_purchase_id": "FUEL00000003",
+      "trip_id": "TRIP00018286",
+      "truck_id": "TRK00024",
+      "driver_id": "DRV00142",
+      "purchase_date": "2022-08-23 13:00:00",
+      "location_city": "Seattle",
+      "location_state": "NE",
+      "gallons": 189.3,
+      "price_per_gallon": 3.804,
+      "total_cost": 720.1,
+      "fuel_card_number": "FC912816",
+      "loaded_at": "2026-11-16T06:24:26.397126+00:00"
+    }
+  ]
+}

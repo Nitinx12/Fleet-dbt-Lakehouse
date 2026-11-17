@@ -1,0 +1,44 @@
+{
+  "contract": "mysql__customers.yml",
+  "source": "mysql.fleet_registry.customers",
+  "landing_table": "bronze.mysql__customers",
+  "primary_key": [
+    "customer_id"
+  ],
+  "row_count_baseline": 200,
+  "sample_rows": [
+    {
+      "customer_id": "CUST00001",
+      "customer_name": "Metro Wholesale",
+      "customer_type": "Dedicated",
+      "credit_terms_days": 60,
+      "primary_freight_type": "General",
+      "account_status": "Inactive",
+      "contract_start_date": "2020-02-20",
+      "annual_revenue_potential": 985117,
+      "loaded_at": "2026-11-16T06:24:26.373059+00:00"
+    },
+    {
+      "customer_id": "CUST00002",
+      "customer_name": "National Retail",
+      "customer_type": "Contract",
+      "credit_terms_days": 30,
+      "primary_freight_type": "Retail",
+      "account_status": "Active",
+      "contract_start_date": "2021-06-02",
+      "annual_revenue_potential": 4936566,
+      "loaded_at": "2026-11-16T06:24:26.373059+00:00"
+    },
+    {
+      "customer_id": "CUST00003",
+      "customer_name": "XYZ Industries",
+      "customer_type": "Contract",
+      "credit_terms_days": 30,
+      "primary_freight_type": "Consumer Goods",
+      "account_status": "Active",
+      "contract_start_date": "2020-09-04",
+      "annual_revenue_potential": 3102814,
+      "loaded_at": "2026-11-16T06:24:26.373059+00:00"
+    }
+  ]
+}

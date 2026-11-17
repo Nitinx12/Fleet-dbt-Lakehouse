@@ -1,0 +1,56 @@
+{
+  "contract": "mysql__drivers.yml",
+  "source": "mysql.fleet_registry.drivers",
+  "landing_table": "bronze.mysql__drivers",
+  "primary_key": [
+    "driver_id"
+  ],
+  "row_count_baseline": 150,
+  "sample_rows": [
+    {
+      "driver_id": "DRV00001",
+      "first_name": "Jennifer",
+      "last_name": "Hernandez",
+      "hire_date": "2014-10-31",
+      "termination_date": null,
+      "license_number": "DL673510887",
+      "license_state": "WA",
+      "date_of_birth": "1973-11-07",
+      "home_terminal": "Denver",
+      "employment_status": "Active",
+      "cdl_class": "A",
+      "years_experience": 3,
+      "loaded_at": "2026-11-16T06:24:26.374455+00:00"
+    },
+    {
+      "driver_id": "DRV00002",
+      "first_name": "William",
+      "last_name": "Martin",
+      "hire_date": "2020-10-02",
+      "termination_date": null,
+      "license_number": "DL128955006",
+      "license_state": "GA",
+      "date_of_birth": "1976-11-03",
+      "home_terminal": "Columbus",
+      "employment_status": "Active",
+      "cdl_class": "A",
+      "years_experience": 20,
+      "loaded_at": "2026-11-16T06:24:26.374455+00:00"
+    },
+    {
+      "driver_id": "DRV00003",
+      "first_name": "Charles",
+      "last_name": "Hernandez",
+      "hire_date": "2021-09-21",
+      "termination_date": null,
+      "license_number": "DL523076025",
+      "license_state": "NC",
+      "date_of_birth": "1970-04-06",
+      "home_terminal": "Salt Lake City",
+      "employment_status": "Active",
+      "cdl_class": "A",
+      "years_experience": 19,
+      "loaded_at": "2026-11-16T06:24:26.374455+00:00"
+    }
+  ]
+}

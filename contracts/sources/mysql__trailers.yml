@@ -1,0 +1,56 @@
+# Source contract: mysql.fleet_registry.trailers
+# Generated from data/mysql/trailers.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.trailers
+landing_table: bronze.mysql__trailers
+owner: fleet-data-eng
+primary_key:
+- trailer_id
+extraction:
+  mode: full_replace
+columns:
+- name: trailer_id
+  type: string
+  nullable: false
+- name: trailer_number
+  type: int
+  nullable: false
+- name: trailer_type
+  type: string
+  nullable: false
+- name: length_feet
+  type: int
+  nullable: false
+- name: model_year
+  type: int
+  nullable: false
+- name: vin
+  type: string
+  nullable: false
+- name: acquisition_date
+  type: date
+  nullable: false
+- name: status
+  type: string
+  nullable: false
+  accepted_values:
+  - Active
+  - Inactive
+  - Maintenance
+- name: current_location
+  type: string
+  nullable: false
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 180
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump

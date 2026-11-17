@@ -1,0 +1,20 @@
+version: 2
+sources:
+  - name: bronze
+    database: fleet_warehouse
+    schema: bronze
+    description: "This source contains raw data from the Postgres bronze schema."
+
+    tables:
+      - name: mongo__delivery_events
+      - name: mongo__maintenance_records
+      - name: mongo__safety_incidents
+      - name: mysql__customers
+      - name: mysql__drivers
+      - name: mysql__facilities
+      - name: mysql__fuel_purchases
+      - name: mysql__loads
+      - name: mysql__routes
+      - name: mysql__trailers
+      - name: mysql__trips
+      - name: mysql__trucks

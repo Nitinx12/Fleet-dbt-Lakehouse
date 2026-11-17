@@ -1,0 +1,53 @@
+# Source contract: mysql.fleet_registry.facilities
+# Generated from data/mysql/facilities.csv — edit deliberately; breaking changes = major bump.
+contract_version: 1.0.0
+source: mysql.fleet_registry.facilities
+landing_table: bronze.mysql__facilities
+owner: fleet-data-eng
+primary_key:
+- facility_id
+extraction:
+  mode: full_replace
+columns:
+- name: facility_id
+  type: string
+  nullable: false
+- name: facility_name
+  type: string
+  nullable: false
+- name: facility_type
+  type: string
+  nullable: false
+- name: city
+  type: string
+  nullable: false
+- name: state
+  type: string
+  nullable: false
+- name: latitude
+  type: decimal(10,4)
+  nullable: false
+- name: longitude
+  type: decimal(10,4)
+  nullable: false
+- name: dock_doors
+  type: int
+  nullable: false
+  min: 0
+- name: operating_hours
+  type: string
+  nullable: false
+- name: loaded_at
+  type: timestamp
+  nullable: false
+quality:
+  row_count:
+    baseline: 50
+    tolerance_pct: 5
+freshness:
+  loaded_at_field: loaded_at
+  warn_after_hours: 26
+  error_after_hours: 48
+change_policy:
+  additive_column: minor_bump
+  removed_or_retyped: major_bump
