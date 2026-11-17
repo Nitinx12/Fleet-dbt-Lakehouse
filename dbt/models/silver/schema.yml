@@ -1,0 +1,393 @@
+version: 2
+
+models:
+  - name: customers
+    description: "Cleaned and validated customer records from MySQL bronze."
+    config:
+      contract:
+        enforced: false
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: customer_id
+        description: "Primary key from the source system."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: "Trimmed customer name."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: customer_type
+        description: "Normalised customer type."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Spot', 'Contract', 'Dedicated', 'Unknown']
+      - name: credit_terms_days
+        description: "Credit terms in days (15-60)."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: primary_freight_type
+        description: "Primary freight type."
+        data_type: text
+      - name: account_status
+        description: "Account status."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Active', 'Inactive']
+      - name: contract_start_date
+        description: "Contract start date."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: annual_revenue_potential
+        description: "Annual revenue potential."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: delivery_events
+    description: "Cleaned and validated delivery events from MongoDB bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: event_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: load_id
+        description: "Load reference."
+        data_type: text
+      - name: trip_id
+        description: "Trip reference."
+        data_type: text
+      - name: facility_id
+        description: "Facility reference."
+        data_type: text
+      - name: event_type
+        description: "Normalised event type."
+        data_type: text
+      - name: scheduled_datetime
+        description: "Scheduled time (UTC)."
+        data_type: timestamp without time zone
+      - name: actual_datetime
+        description: "Actual time (UTC)."
+        data_type: timestamp without time zone
+        tests:
+          - not_in_future:
+              tolerance_days: 1
+      - name: delay_minutes
+        description: "Actual minus scheduled, in minutes."
+        data_type: numeric
+      - name: detention_minutes
+        description: "Detention minutes."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: detention_hours
+        description: "Detention hours."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: on_time_flag
+        description: "Whether the delivery was on time."
+        data_type: boolean
+      - name: location_city
+        description: "City."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: location_state
+        description: "US state code."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: drivers
+    description: "Cleaned driver records from MySQL bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: true
+    columns:
+      - name: driver_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: "First name (PII)."
+        data_type: text
+      - name: last_name
+        description: "Last name (PII)."
+        data_type: text
+      - name: full_name
+        description: "Display name."
+        data_type: text
+      - name: hire_date
+        description: "Hire date."
+        data_type: date
+        tests:
+          - not_in_future
+          - date_not_before:
+              other_column: date_of_birth
+      - name: termination_date
+        description: "Termination date."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: license_number
+        description: "License number (PII - hashed in gold)."
+        data_type: text
+      - name: license_state
+        description: "License state code."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: date_of_birth
+        description: "Date of birth (PII)."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: age_years
+        description: "Age in years."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: home_terminal
+        description: "Home terminal."
+        data_type: text
+      - name: employment_status
+        description: "Employment status."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Active', 'Inactive', 'Terminated', 'On Leave', 'Unknown']
+      - name: is_active
+        description: "Whether the driver is active."
+        data_type: boolean
+      - name: is_employment_consistent
+        description: "Terminated status matches a termination date."
+        data_type: boolean
+      - name: cdl_class
+        description: "CDL class."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['A', 'B', 'C']
+      - name: years_experience
+        description: "Years of experience."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: tenure_years
+        description: "Tenure in years."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: maintenance_records
+    description: "Cleaned maintenance records from MongoDB bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: maintenance_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: truck_id
+        description: "Truck reference."
+        data_type: text
+      - name: maintenance_date
+        description: "Maintenance date."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: maintenance_type
+        description: "Maintenance type."
+        data_type: text
+      - name: odometer_reading
+        description: "Odometer reading."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: labour_hours
+        description: "Labour hours."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: labour_cost
+        description: "Labour cost."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: parts_cost
+        description: "Parts cost."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: total_cost
+        description: "Total cost."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: calculated_total_cost
+        description: "Labour plus parts."
+        data_type: numeric
+      - name: is_total_cost_consistent
+        description: "Source total agrees with labour plus parts."
+        data_type: boolean
+      - name: labour_cost_per_hour
+        description: "Labour cost per hour."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: facility_location
+        description: "Facility location."
+        data_type: text
+      - name: downtime_hours
+        description: "Downtime hours."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: service_description
+        description: "Service description."
+        data_type: text
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: safety_incidents
+    description: "Cleaned safety incidents from MongoDB bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: true
+    columns:
+      - name: incident_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: trip_id
+        description: "Trip reference."
+        data_type: text
+      - name: truck_id
+        description: "Truck reference."
+        data_type: text
+      - name: driver_id
+        description: "Driver reference."
+        data_type: text
+      - name: incident_date
+        description: "Incident date."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: incident_type
+        description: "Incident type."
+        data_type: text
+      - name: location_city
+        description: "City."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: location_state
+        description: "US state code."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: at_fault_flag
+        description: "Whether the driver was at fault."
+        data_type: boolean
+      - name: injury_flag
+        description: "Whether there was an injury."
+        data_type: boolean
+      - name: vehicle_damage_cost
+        description: "Vehicle damage cost."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: cargo_damage_cost
+        description: "Cargo damage cost."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: total_damage_cost
+        description: "Vehicle plus cargo damage."
+        data_type: numeric
+      - name: claim_amount
+        description: "Claim amount."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: has_claim
+        description: "Whether a claim was filed."
+        data_type: boolean
+      - name: preventable_flag
+        description: "Whether the incident was preventable."
+        data_type: boolean
+      - name: description
+        description: "Incident description (PII - bronze only in gold)."
+        data_type: text
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
