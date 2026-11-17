@@ -26,6 +26,7 @@ help:
 	@echo   make clean       remove __pycache__ and .pytest_cache
 	@echo   make dbt-debug   dbt debug (loads .env)
 	@echo   make dbt-silver dbt run silver models
+	@echo   make dbt-silver-tests dbt test silver models
 	@echo   make dbt-run     dbt run all models
 	@echo.
 
@@ -71,4 +72,8 @@ dbt-silver:
 
 dbt-run:
 	$(UV) run python scripts/run_dbt.py run
+
+
+dbt-silver-tests:
+	$(UV) run python scripts/run_dbt.py test --select silver
 
