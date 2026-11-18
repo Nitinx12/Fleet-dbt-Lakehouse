@@ -14,3 +14,6 @@ models:
 
 vars:
   silver_lookback_hours: 24
+  gold_date_start: '2015-01-01'    # dim_date range; must cover your data
+  gold_date_end: '2035-12-31'
+  gold_lookback_hours: 3

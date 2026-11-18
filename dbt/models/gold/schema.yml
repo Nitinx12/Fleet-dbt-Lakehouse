@@ -1,0 +1,326 @@
+version: 2
+
+# Gold layer: star schema.
+# Every dimension has an "Unknown" member (natural id '-1'); facts point at it instead of NULL.
+# Relationship tests are severity: warn because an orphan means a source reference with no dimension row.
+
+models:
+
+  # ============================================================ DIMENSIONS
+  - name: dim_date
+    description: "Calendar dimension, one row per day plus an Unknown member (date_key = -1). ISO weeks (Monday start)."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: date_key
+        description: "Primary key, YYYYMMDD integer. -1 = Unknown."
+        tests: [unique, not_null]
+      - name: date_day
+        description: "Calendar date. NULL on the Unknown member."
+      - name: day_name
+        description: "Monday ... Sunday."
+      - name: is_weekend
+        description: "Saturday or Sunday."
+
+  - name: dim_customers
+    description: "Customers, SCD Type 1 (current state only, attributes overwritten)."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false, scd_type: 1}
+    columns:
+      - name: customer_key
+        description: "Surrogate key, MD5(customer_id)."
+        tests: [unique, not_null]
+      - name: customer_id
+        description: "Natural key from the source system. '-1' = Unknown member."
+        tests: [unique, not_null]
+      - name: customer_type
+        tests:
+          - accepted_values:
+              values: ['Spot', 'Contract', 'Dedicated', 'Unknown']
+      - name: credit_terms_band
+        description: "Banded credit terms (15-30 / 31-45 / 46-60 days)."
+      - name: account_status
+        tests:
+          - accepted_values:
+              values: ['Active', 'Inactive', 'Unknown']
+      - name: is_active
+        description: "TRUE when account_status is Active; NULL when unknown."
+      - name: contract_tenure_years
+        description: "Years since contract_start_date, as of the last gold run."
+
+  - name: dim_drivers
+    description: "Drivers, SCD Type 1. PII reduced: license number is hashed, date of birth and first/last name are dropped."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: true, scd_type: 1}
+    columns:
+      - name: driver_key
+        description: "Surrogate key, MD5(driver_id)."
+        tests: [unique, not_null]
+      - name: driver_id
+        description: "Natural key from the source system. '-1' = Unknown member."
+        tests: [unique, not_null]
+      - name: full_name
+        description: "Display name (PII)."
+      - name: license_number_hash
+        description: "Salted SHA-256 of the licence number. Set GOLD_PII_SALT in the environment."
+      - name: age_years
+        description: "Age as of the last gold run (derived from date of birth, which is not exposed)."
+      - name: age_band
+        tests:
+          - accepted_values:
+              values: ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Unknown']
+      - name: employment_status
+        tests:
+          - accepted_values:
+              values: ['Active', 'Inactive', 'Terminated', 'On Leave', 'Unknown']
+      - name: cdl_class
+        tests:
+          - accepted_values:
+              values: ['A', 'B', 'C', 'Unknown']
+      - name: experience_band
+        tests:
+          - accepted_values:
+              values: ['<1 year', '1-4 years', '5-9 years', '10-19 years', '20+ years', 'Unknown']
+      - name: tenure_band
+        tests:
+          - accepted_values:
+              values: ['<1 year', '1-2 years', '3-5 years', '6-10 years', '10+ years', 'Unknown']
+
+  - name: dim_trucks
+    description: "Trucks (current state)."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: truck_key
+        description: "Surrogate key, MD5(truck_id)."
+        tests: [unique, not_null]
+      - name: truck_id
+        description: "Natural key. '-1' = Unknown member."
+        tests: [unique, not_null]
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['Active', 'Maintenance', 'Inactive', 'Unknown']
+      - name: age_band
+        tests:
+          - accepted_values:
+              values: ['0-2 years', '3-5 years', '6-10 years', '11+ years', 'Unknown']
+
+  - name: dim_trailers
+    description: "Trailers (current state)."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: trailer_key
+        description: "Surrogate key, MD5(trailer_id)."
+        tests: [unique, not_null]
+      - name: trailer_id
+        description: "Natural key. '-1' = Unknown member."
+        tests: [unique, not_null]
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['Active', 'Inactive', 'Maintenance', 'Unknown']
+      - name: age_band
+        tests:
+          - accepted_values:
+              values: ['0-2 years', '3-5 years', '6-10 years', '11+ years', 'Unknown']
+
+  - name: dim_facilities
+    description: "Facilities: terminals, warehouses, cross-docks and distribution centres."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: facility_key
+        description: "Surrogate key, MD5(facility_id)."
+        tests: [unique, not_null]
+      - name: facility_id
+        description: "Natural key. '-1' = Unknown member."
+        tests: [unique, not_null]
+
+  - name: dim_routes
+    description: "Lanes (origin to destination) with rate card and typical distance."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: route_key
+        description: "Surrogate key, MD5(route_id)."
+        tests: [unique, not_null]
+      - name: route_id
+        description: "Natural key. '-1' = Unknown member."
+        tests: [unique, not_null]
+      - name: haul_type
+        description: "Short (<250 mi), Medium (250-999 mi), Long (1000+ mi)."
+        tests:
+          - accepted_values:
+              values: ['Short Haul', 'Medium Haul', 'Long Haul', 'Unknown']
+
+  # ================================================================ FACTS
+  - name: fct_loads
+    description: "Grain: one row per load. Revenue and charges at load level."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: load_key
+        description: "Primary key, MD5(load_id)."
+        tests: [unique, not_null]
+      - name: load_id
+        description: "Degenerate dimension."
+        tests: [not_null]
+      - name: customer_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_customers')", field: customer_key, config: {severity: warn}}
+      - name: route_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_routes')", field: route_key, config: {severity: warn}}
+      - name: load_date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: load_status
+        tests:
+          - accepted_values:
+              values: ['Completed', 'In Transit', 'Delivered', 'Cancelled', 'Booked', 'Unknown']
+      - name: revenue
+        tests: [non_negative]
+      - name: total_charges
+        description: "revenue + fuel_surcharge + accessorial_charges; NULL when any component is unknown."
+
+  - name: fct_trips
+    description: "Grain: one row per trip. customer_key and route_key are inherited from the parent load."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: trip_key
+        description: "Primary key, MD5(trip_id)."
+        tests: [unique, not_null]
+      - name: load_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('fct_loads')
+              field: load_key
+              config: {severity: warn, where: "load_id IS NOT NULL"}
+      - name: driver_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
+      - name: truck_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
+      - name: trailer_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trailers')", field: trailer_key, config: {severity: warn}}
+      - name: customer_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_customers')", field: customer_key, config: {severity: warn}}
+      - name: route_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_routes')", field: route_key, config: {severity: warn}}
+      - name: dispatch_date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: average_speed_mph
+        description: "actual_distance_miles / actual_duration_hours. Non-additive."
+
+  - name: fct_delivery_events
+    description: "Grain: one row per delivery event. driver/truck come from the parent trip, customer from the parent load."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: event_key
+        description: "Primary key, MD5(event_id)."
+        tests: [unique, not_null]
+      - name: facility_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_facilities')", field: facility_key, config: {severity: warn}}
+      - name: driver_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
+      - name: truck_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
+      - name: customer_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_customers')", field: customer_key, config: {severity: warn}}
+      - name: scheduled_date_key
+        description: "Role-playing key into dim_date (scheduled)."
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: actual_date_key
+        description: "Role-playing key into dim_date (actual). -1 when no actual time."
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: detention_minutes
+        tests: [non_negative]
+
+  - name: fct_fuel_purchases
+    description: "Grain: one row per fuel purchase. Fuel card number is masked."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: fuel_purchase_key
+        description: "Primary key, MD5(fuel_purchase_id)."
+        tests: [unique, not_null]
+      - name: truck_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
+      - name: driver_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
+      - name: purchase_date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: fuel_card_masked
+        description: "Fuel card number with all but the last 4 characters replaced by *."
+      - name: gallons
+        tests: [non_negative]
+      - name: total_cost
+        tests: [non_negative]
+
+  - name: fct_maintenance
+    description: "Grain: one row per maintenance work order."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: maintenance_key
+        description: "Primary key, MD5(maintenance_id)."
+        tests: [unique, not_null]
+      - name: truck_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
+      - name: maintenance_date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: total_cost
+        tests: [non_negative]
+      - name: downtime_hours
+        tests: [non_negative]
+
+  - name: fct_safety_incidents
+    description: "Grain: one row per safety incident. Free-text description is excluded (PII)."
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false}
+    columns:
+      - name: incident_key
+        description: "Primary key, MD5(incident_id)."
+        tests: [unique, not_null]
+      - name: driver_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
+      - name: truck_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
+      - name: incident_date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: total_damage_cost
+        description: "vehicle_damage_cost + cargo_damage_cost; NULL when either is unknown."

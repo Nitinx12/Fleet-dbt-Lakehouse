@@ -43,6 +43,7 @@ CREATE DATABASE fleet_warehouse
 CREATE SCHEMA IF NOT EXISTS bronze AUTHORIZATION postgres;
 CREATE SCHEMA IF NOT EXISTS silver AUTHORIZATION postgres;
 CREATE SCHEMA IF NOT EXISTS gold AUTHORIZATION postgres;
+CREATE SCHEMA IF NOT EXISTS marts AUTHORIZATION postgres;
 CREATE SCHEMA IF NOT EXISTS audit AUTHORIZATION postgres;
 CREATE SCHEMA IF NOT EXISTS control AUTHORIZATION postgres;
 
@@ -52,6 +53,7 @@ CREATE SCHEMA IF NOT EXISTS control AUTHORIZATION postgres;
 COMMENT ON SCHEMA bronze IS 'Stores raw data ingested from source systems.';
 COMMENT ON SCHEMA silver IS 'Stores cleaned, standardized and validated data transformed using dbt.';
 COMMENT ON SCHEMA gold IS 'Stores business-ready analytical models and reporting datasets.';
+COMMENT ON SCHEMA marts IS 'Contains business-ready, aggregated, and dimensional datasets designed for reporting, analytics, and BI consumption.';
 COMMENT ON SCHEMA audit IS 'Stores pipeline execution logs, data quality results, reconciliation records and error logs.';
 COMMENT ON SCHEMA control IS 'Stores pipeline control information, incremental load watermarks and batch tracking.';
 
@@ -75,6 +77,7 @@ WHERE schema_name IN (
     'bronze',
     'silver',
     'gold',
+    'marts',
     'audit',
     'control'
 )
