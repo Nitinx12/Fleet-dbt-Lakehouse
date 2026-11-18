@@ -34,6 +34,9 @@ models:
         data_type: integer
         tests:
           - non_negative
+          - within_range:
+              min_value: 15
+              max_value: 60
       - name: primary_freight_type
         description: "Primary freight type."
         data_type: text
@@ -53,6 +56,8 @@ models:
         data_type: numeric
         tests:
           - non_negative
+          - max_scale:
+              max_digits: 2
       - name: _ingested_at
         description: "Bronze ingestion timestamp."
         data_type: timestamp with time zone
@@ -184,6 +189,9 @@ models:
         data_type: integer
         tests:
           - non_negative
+          - within_range:
+              min_value: 18
+              max_value: 100
       - name: home_terminal
         description: "Home terminal."
         data_type: text
@@ -199,6 +207,8 @@ models:
       - name: is_employment_consistent
         description: "Terminated status matches a termination date."
         data_type: boolean
+        tests:
+          - is_true
       - name: cdl_class
         description: "CDL class."
         data_type: text
@@ -215,6 +225,254 @@ models:
         data_type: numeric
         tests:
           - non_negative
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: facilities
+    description: "Cleaned facility records from MySQL bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: facility_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: facility_name
+        description: "Facility name."
+        data_type: text
+      - name: facility_type
+        description: "Facility type."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Cross-Dock', 'Distribution Center', 'Terminal', 'Warehouse']
+      - name: city
+        description: "City."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: state
+        description: "US state code."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: latitude
+        description: "Latitude in decimal degrees."
+        data_type: numeric
+        tests:
+          - within_range:
+              min_value: -90
+              max_value: 90
+      - name: longitude
+        description: "Longitude in decimal degrees."
+        data_type: numeric
+        tests:
+          - within_range:
+              min_value: -180
+              max_value: 180
+      - name: dock_doors
+        description: "Number of dock doors."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: operating_hours
+        description: "Operating hours."
+        data_type: text
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: fuel_purchases
+    description: "Cleaned fuel purchases from MySQL bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: true
+    columns:
+      - name: fuel_purchase_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: trip_id
+        description: "Trip reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('trips')
+              field: trip_id
+      - name: truck_id
+        description: "Truck reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('trucks')
+              field: truck_id
+      - name: driver_id
+        description: "Driver reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('drivers')
+              field: driver_id
+      - name: purchase_date
+        description: "Purchase timestamp (UTC)."
+        data_type: timestamp without time zone
+        tests:
+          - not_in_future:
+              tolerance_days: 1
+      - name: location_city
+        description: "City of purchase."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: location_state
+        description: "US state code of purchase."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: gallons
+        description: "Gallons bought."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: price_per_gallon
+        description: "Price per gallon."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: total_cost
+        description: "Source total cost."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: calculated_total_cost
+        description: "Gallons times price per gallon."
+        data_type: numeric
+        tests:
+          - max_scale:
+              max_digits: 2
+      - name: is_total_cost_consistent
+        description: "Source total agrees with gallons times price."
+        data_type: boolean
+        tests:
+          - is_true
+      - name: fuel_card_number
+        description: "Fuel card number (PII - masked in gold)."
+        data_type: text
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: loads
+    description: "Cleaned load records from MySQL bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: load_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Customer reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('customers')
+              field: customer_id
+      - name: route_id
+        description: "Route reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('routes')
+              field: route_id
+      - name: load_date
+        description: "Load date."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: load_type
+        description: "Equipment type."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Dry Van', 'Refrigerated', 'Flatbed', 'Tanker']
+      - name: weight_lbs
+        description: "Load weight in pounds."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: pieces
+        description: "Piece count."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: revenue
+        description: "Base revenue."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: fuel_surcharge
+        description: "Fuel surcharge."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: accessorial_charges
+        description: "Accessorial charges."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: total_charges
+        description: "Revenue plus fuel surcharge plus accessorials."
+        data_type: numeric
+      - name: load_status
+        description: "Load status."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Completed', 'In Transit', 'Delivered', 'Cancelled', 'Booked']
+      - name: booking_type
+        description: "Booking type."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Dedicated', 'Contract', 'Spot']
       - name: loaded_at
         description: "Source load timestamp."
         data_type: timestamp without time zone
@@ -265,27 +523,40 @@ models:
         data_type: numeric
         tests:
           - non_negative
+          - max_scale:
+              max_digits: 2
       - name: parts_cost
         description: "Parts cost."
         data_type: numeric
         tests:
           - non_negative
+          - max_scale:
+              max_digits: 2
       - name: total_cost
         description: "Total cost."
         data_type: numeric
         tests:
           - non_negative
+          - max_scale:
+              max_digits: 2
       - name: calculated_total_cost
         description: "Labour plus parts."
         data_type: numeric
+        tests:
+          - max_scale:
+              max_digits: 2
       - name: is_total_cost_consistent
         description: "Source total agrees with labour plus parts."
         data_type: boolean
+        tests:
+          - is_true
       - name: labour_cost_per_hour
         description: "Labour cost per hour."
         data_type: numeric
         tests:
           - non_negative
+          - max_scale:
+              max_digits: 2
       - name: facility_location
         description: "Facility location."
         data_type: text
@@ -297,6 +568,76 @@ models:
       - name: service_description
         description: "Service description."
         data_type: text
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: routes
+    description: "Cleaned lane records from MySQL bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: route_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: origin_city
+        description: "Origin city."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: origin_state
+        description: "Origin US state code."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: destination_city
+        description: "Destination city."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: destination_state
+        description: "Destination US state code."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: typical_distance_miles
+        description: "Typical lane distance in miles."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: base_rate_per_mile
+        description: "Base rate per mile."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: fuel_surcharge_rate
+        description: "Fuel surcharge rate per mile."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: typical_transit_days
+        description: "Typical transit time in days."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: base_lane_revenue
+        description: "Typical distance at the base rate per mile."
+        data_type: numeric
+        tests:
+          - max_scale:
+              max_digits: 2
       - name: loaded_at
         description: "Source load timestamp."
         data_type: timestamp without time zone
@@ -359,19 +700,28 @@ models:
         data_type: numeric
         tests:
           - non_negative
+          - max_scale:
+              max_digits: 2
       - name: cargo_damage_cost
         description: "Cargo damage cost."
         data_type: numeric
         tests:
           - non_negative
+          - max_scale:
+              max_digits: 2
       - name: total_damage_cost
         description: "Vehicle plus cargo damage."
         data_type: numeric
+        tests:
+          - max_scale:
+              max_digits: 2
       - name: claim_amount
         description: "Claim amount."
         data_type: numeric
         tests:
           - non_negative
+          - max_scale:
+              max_digits: 2
       - name: has_claim
         description: "Whether a claim was filed."
         data_type: boolean
@@ -390,4 +740,244 @@ models:
       - name: silver_loaded_at
         description: "Silver load timestamp."
         data_type: timestamp with time zone
+
+  - name: trailers
+    description: "Cleaned trailer records from MySQL bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: trailer_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: trailer_number
+        description: "Trailer number."
+        data_type: integer
+      - name: trailer_type
+        description: "Trailer type."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Dry Van', 'Refrigerated']
+      - name: length_feet
+        description: "Trailer length in feet."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: model_year
+        description: "Model year."
+        data_type: integer
+      - name: vin
+        description: "Vehicle identification number."
+        data_type: text
+      - name: acquisition_date
+        description: "Acquisition date."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: status
+        description: "Trailer status."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Active', 'Inactive', 'Maintenance']
+      - name: is_available
+        description: "Whether the trailer is Active."
+        data_type: boolean
+      - name: age_years
+        description: "Years since the model year."
+        data_type: integer
+      - name: current_location
+        description: "Current location."
+        data_type: text
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: trips
+    description: "Cleaned trip records from MySQL bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: trip_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: load_id
+        description: "Load reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('loads')
+              field: load_id
+      - name: driver_id
+        description: "Driver reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('drivers')
+              field: driver_id
+      - name: truck_id
+        description: "Truck reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('trucks')
+              field: truck_id
+      - name: trailer_id
+        description: "Trailer reference."
+        data_type: text
+        tests:
+          - relationships:
+              to: ref('trailers')
+              field: trailer_id
+      - name: dispatch_date
+        description: "Dispatch date."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: actual_distance_miles
+        description: "Actual distance in miles."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: actual_duration_hours
+        description: "Actual duration in hours."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: fuel_gallons_used
+        description: "Fuel burnt in gallons."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: average_mpg
+        description: "Source miles per gallon."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: idle_time_hours
+        description: "Idle time in hours."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: calculated_mpg
+        description: "Distance divided by gallons used."
+        data_type: numeric
+      - name: is_mpg_consistent
+        description: "Source MPG agrees with distance over gallons."
+        data_type: boolean
+        tests:
+          - is_true
+      - name: idle_share_of_duration
+        description: "Idle hours as a share of trip duration; unknown when idle exceeds duration."
+        data_type: numeric
+        tests:
+          - within_range:
+              min_value: 0
+              max_value: 1
+      - name: trip_status
+        description: "Trip status."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Completed', 'In Transit', 'Planned', 'Cancelled']
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
+  - name: trucks
+    description: "Cleaned truck records from MySQL bronze."
+    meta:
+      owner: data-engineering
+      tier: silver
+      serve: false
+      contains_pii: false
+    columns:
+      - name: truck_id
+        description: "Primary key."
+        data_type: text
+        tests:
+          - unique
+          - not_null
+      - name: unit_number
+        description: "Fleet unit number."
+        data_type: integer
+      - name: make
+        description: "Truck make."
+        data_type: text
+      - name: model_year
+        description: "Model year."
+        data_type: integer
+      - name: vin
+        description: "Vehicle identification number."
+        data_type: text
+      - name: acquisition_date
+        description: "Acquisition date."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: acquisition_mileage
+        description: "Odometer at acquisition."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: fuel_type
+        description: "Fuel type."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Diesel']
+      - name: tank_capacity_gallons
+        description: "Fuel tank capacity in gallons."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: status
+        description: "Truck status."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Active', 'Maintenance', 'Inactive']
+      - name: is_available
+        description: "Whether the truck is Active."
+        data_type: boolean
+      - name: age_years
+        description: "Years since the model year."
+        data_type: integer
+      - name: home_terminal
+        description: "Home terminal."
+        data_type: text
+      - name: loaded_at
+        description: "Source load timestamp."
+        data_type: timestamp without time zone
+      - name: _ingested_at
+        description: "Bronze ingestion timestamp."
+        data_type: timestamp with time zone
+      - name: silver_loaded_at
+        description: "Silver load timestamp."
+        data_type: timestamp with time zone
+
 
