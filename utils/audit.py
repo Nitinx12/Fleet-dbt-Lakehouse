@@ -28,6 +28,10 @@ _ERROR_SEVERITIES = frozenset({"WARNING", "ERROR", "CRITICAL"})
 _ERROR_COMPONENTS = frozenset(
     {"AIRFLOW", "DBT", "INGESTION", "DATA_QUALITY", "CONTROL", "OTHER"}
 )
+_TASK_LAYERS = frozenset({"bronze", "silver", "gold", "audit", "control"})
+_DQ_LAYERS = frozenset({"bronze", "silver", "gold"})
+_RECON_TARGET_LAYERS = frozenset({"bronze", "silver", "gold"})
+_ERROR_LAYERS = frozenset({"bronze", "silver", "gold"})
 
 
 class AuditError(RuntimeError):
@@ -74,6 +78,8 @@ def start_task(
     target: Engine | Connection | None = None,
 ) -> int:
     """Open a RUNNING task attempt and return its task_log_id (a retry reuses it)."""
+    if layer is not None:
+        _require(layer, _TASK_LAYERS, "layer")
     sql = text(
         """
         INSERT INTO audit.task_run_log
@@ -257,6 +263,9 @@ def log_data_quality(
 
     rows = []
     for item in checks:
+        layer = item.get("layer")
+        if layer is not None:
+            _require(str(layer), _DQ_LAYERS, "layer")
         rows.append(
             {
                 "batch_id": batch_id,
@@ -315,6 +324,17 @@ def log_reconciliation(
 
     rows = []
     for item in comparisons:
+        target_layer = str(_field(item, "target_layer"))
+        _require(target_layer, _RECON_TARGET_LAYERS, "target_layer")
+        source_row_count = _field(item, "source_row_count")
+        target_row_count = _field(item, "target_row_count")
+        if source_row_count < 0:
+            raise AuditError("source_row_count must be non-negative")
+        if target_row_count < 0:
+            raise AuditError("target_row_count must be non-negative")
+        tolerance_pct = item.get("tolerance_pct", 0)
+        if tolerance_pct is not None and float(tolerance_pct) < 0:
+            raise AuditError("tolerance_pct must be non-negative")
         rows.append(
             {
                 "batch_id": batch_id,
@@ -369,6 +389,8 @@ def log_error(
     """Insert one pipeline error and return its error_id."""
     _require(severity.upper(), _ERROR_SEVERITIES, "severity")
     _require(component.upper(), _ERROR_COMPONENTS, "component")
+    if layer is not None:
+        _require(str(layer), _ERROR_LAYERS, "layer")
 
     sql = text(
         """
