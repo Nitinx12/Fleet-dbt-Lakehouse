@@ -93,6 +93,10 @@ def test_task_handle_carries_rows_processed() -> None:
 
 @pytest.mark.integration
 def test_round_trip_rolls_back_cleanly() -> None:
+    from uuid import uuid4
+
+    from sqlalchemy.exc import IntegrityError
+
     from utils.connection import get_postgres_engine
 
     try:
@@ -100,11 +104,32 @@ def test_round_trip_rolls_back_cleanly() -> None:
     except SQLAlchemyError:
         pytest.skip("Postgres not reachable")
 
+    suffix = uuid4().hex[:12]
+    pipeline_name = f"audit_test_{suffix}"
+    dag_id = f"dag_audit_{suffix}"
+
     with engine.connect() as connection:
         transaction = connection.begin()
         try:
+            connection.execute(
+                text(
+                    "INSERT INTO control.pipeline (pipeline_name, airflow_dag_id)"
+                    " VALUES (:pipeline_name, :dag_id)"
+                ),
+                {"pipeline_name": pipeline_name, "dag_id": dag_id},
+            )
+            batch_id = int(
+                connection.execute(
+                    text(
+                        "SELECT control.start_batch("
+                        ":pipeline_name, :dag_id, 'run_ok', NULL, 'test')"
+                    ),
+                    {"pipeline_name": pipeline_name, "dag_id": dag_id},
+                ).scalar_one()
+            )
+
             with task_run(
-                999999, "dag_audit", "run_ok", "extract_mysql", target=connection
+                batch_id, dag_id, "run_ok", "extract_mysql", target=connection
             ) as task:
                 task.rows_processed = 3
             opened = (
@@ -124,7 +149,7 @@ def test_round_trip_rolls_back_cleanly() -> None:
             with (
                 pytest.raises(ValueError),
                 task_run(
-                    999999, "dag_audit", "run_bad", "extract_mongo", target=connection
+                    batch_id, dag_id, "run_bad", "extract_mongo", target=connection
                 ),
             ):
                 raise ValueError("boom")
@@ -143,13 +168,35 @@ def test_round_trip_rolls_back_cleanly() -> None:
 
             assert (
                 start_task(
-                    999999, "dag_audit", "run_ok", "extract_mysql", target=connection
+                    batch_id, dag_id, "run_ok", "extract_mysql", target=connection
                 )
                 == task.task_log_id
             )  # same attempt is reused, not duplicated
 
+            connection.execute(
+                text(
+                    "INSERT INTO audit.dbt_invocation"
+                    " (invocation_id, batch_id, dbt_command, started_at)"
+                    " VALUES ('inv-1', :batch_id, 'build', now())"
+                ),
+                {"batch_id": batch_id},
+            )
+            invocation = (
+                connection.execute(
+                    text(
+                        "SELECT batch_id, dbt_command, exit_code"
+                        " FROM audit.dbt_invocation WHERE invocation_id = 'inv-1'"
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            assert invocation["batch_id"] == batch_id
+            assert invocation["dbt_command"] == "build"
+            assert invocation["exit_code"] is None
+
             written = log_dbt_results(
-                999999,
+                batch_id,
                 [
                     {
                         "dbt_invocation_id": "inv-1",
@@ -167,9 +214,10 @@ def test_round_trip_rolls_back_cleanly() -> None:
 
             assert (
                 log_data_quality(
-                    999999,
+                    batch_id,
                     [
                         {
+                            "dbt_invocation_id": "inv-1",
                             "check_name": "not_null_load_id",
                             "check_type": "dbt_test",
                             "status": "pass",
@@ -182,7 +230,7 @@ def test_round_trip_rolls_back_cleanly() -> None:
 
             assert (
                 log_reconciliation(
-                    999999,
+                    batch_id,
                     [
                         {
                             "source_system": "mysql",
@@ -202,7 +250,7 @@ def test_round_trip_rolls_back_cleanly() -> None:
             error_id = log_error(
                 component="ingestion",
                 error_message="cursor went backwards",
-                batch_id=999999,
+                batch_id=batch_id,
                 error_detail={"table": "loads", "cursor": "2024-01-01"},
                 target=connection,
             )
@@ -213,10 +261,29 @@ def test_round_trip_rolls_back_cleanly() -> None:
                 == error_id
             )
 
-            # append-only guard: the four history tables reject UPDATE
-            with pytest.raises(SQLAlchemyError):
+            # append-only guard: the history tables reject UPDATE
+            with pytest.raises(SQLAlchemyError), connection.begin_nested():
                 connection.execute(
                     text("UPDATE audit.dbt_run_results SET message = 'tampered'")
+                )
+            with pytest.raises(SQLAlchemyError), connection.begin_nested():
+                connection.execute(
+                    text("UPDATE audit.dbt_invocation SET exit_code = 0")
+                )
+
+            # batch_id is a real foreign key: an unknown batch is rejected
+            with pytest.raises(IntegrityError), connection.begin_nested():
+                connection.execute(
+                    text(
+                        """
+                            INSERT INTO audit.dbt_run_results
+                                (batch_id, dbt_invocation_id, dbt_command,
+                                 node_unique_id, node_name, resource_type, status)
+                            VALUES
+                                (999999, 'inv-1', 'run', 'model.x', 'x',
+                                 'model', 'SUCCESS')
+                            """
+                    )
                 )
         finally:
             transaction.rollback()

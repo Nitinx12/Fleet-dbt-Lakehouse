@@ -4,8 +4,8 @@
 --
 --   * Airflow, dbt (via an Airflow post-run task) and the control.* functions WRITE here.
 --   * Nothing in the pipeline reads audit.* to make decisions (that is control.*).
---   * No foreign keys to control.* on purpose: audit rows must outlive any
---     clean-up of control data and must never block a pipeline from logging.
+--   * FKs to control.batch and audit.dbt_invocation are added later, by
+--     06_audit_relationships.sql, once control.batch exists.
 --   * Append-only tables are protected by triggers (UPDATE / DELETE / TRUNCATE blocked).
 --
 -- Safe to run repeatedly.

@@ -23,11 +23,11 @@ def main() -> int:
     """Run dbt, audit the invocation, and return dbt's own exit code."""
     started = datetime.now(UTC)
     exit_code = subprocess.call([str(DBT), *sys.argv[1:]], cwd=ROOT / "dbt")
-    audit_invocation(started, exit_code)
+    audit_invocation(started, exit_code, dbt_target=_dbt_target(sys.argv[1:]))
     return exit_code
 
 
-def audit_invocation(started: datetime, exit_code: int) -> None:
+def audit_invocation(started: datetime, exit_code: int, dbt_target: str) -> None:
     """Best effort: a broken audit trail must never hide dbt's exit code."""
     from utils import dbt_audit
     from utils.logger import get_logger
@@ -35,10 +35,23 @@ def audit_invocation(started: datetime, exit_code: int) -> None:
     log = get_logger("run_dbt")
     try:
         dbt_audit.audit_invocation(
-            ROOT / "dbt", started_after=started, exit_code=exit_code
+            ROOT / "dbt",
+            started_after=started,
+            exit_code=exit_code,
+            dbt_target=dbt_target,
         )
     except Exception:
         log.exception("dbt audit load failed")
+
+
+def _dbt_target(argv: list[str]) -> str:
+    """dbt does not record --target in its artifacts, so read it from argv."""
+    for index, arg in enumerate(argv):
+        if arg in ("--target", "-t") and index + 1 < len(argv):
+            return argv[index + 1]
+        if arg.startswith("--target="):
+            return arg.split("=", 1)[1]
+    return "dev"
 
 
 if __name__ == "__main__":

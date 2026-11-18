@@ -89,6 +89,7 @@ def audit_invocation(
     *,
     started_after: datetime,
     exit_code: int,
+    dbt_target: str | None = None,
     target: Engine | Connection | None = None,
 ) -> tuple[int, int]:
     """Land one finished dbt invocation in audit.*; returns (run_rows, dq_rows)."""
@@ -108,6 +109,9 @@ def audit_invocation(
         return 0, 0
 
     invocation_id = str((run_results.get("metadata") or {}).get("invocation_id") or "")
+    if not invocation_id:
+        log.warning("run_results.json has no invocation_id; skipping audit")
+        return 0, 0
     run_rows, dq_rows = parse_results(
         run_results.get("results") or [],
         manifest,
@@ -120,6 +124,19 @@ def audit_invocation(
 
     batch_id = resolve_batch(target=target)
     try:
+        _log_invocation(
+            _invocation_row(
+                invocation_id=invocation_id,
+                batch_id=batch_id,
+                command=command,
+                dbt_target=dbt_target
+                or str((run_results.get("args") or {}).get("target") or "")
+                or None,
+                started_at=invocation_started_at(run_results),
+                exit_code=exit_code,
+            ),
+            target=target,
+        )
         run_count = audit.log_dbt_results(batch_id, run_rows, target=target)
         dq_count = audit.log_data_quality(batch_id, dq_rows, target=target)
     except Exception:
@@ -185,6 +202,45 @@ def resolve_batch(target: Engine | Connection | None = None) -> int:
 
     log.info("audit batch %s opened as %s", batch_id, run_id)
     return batch_id
+
+
+def _invocation_row(
+    *,
+    invocation_id: str,
+    batch_id: int,
+    command: str,
+    dbt_target: str | None,
+    started_at: datetime | None,
+    exit_code: int,
+) -> dict[str, Any]:
+    return {
+        "invocation_id": invocation_id,
+        "batch_id": batch_id,
+        "dbt_command": command,
+        "dbt_target": dbt_target,
+        "started_at": started_at,
+        "exit_code": exit_code,
+    }
+
+
+def _log_invocation(
+    row: Mapping[str, Any], target: Engine | Connection | None = None
+) -> None:
+    with _transaction(target) as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO audit.dbt_invocation
+                    (invocation_id, batch_id, dbt_command, dbt_target,
+                     started_at, exit_code)
+                VALUES
+                    (:invocation_id, :batch_id, :dbt_command, :dbt_target,
+                     :started_at, :exit_code)
+                ON CONFLICT (invocation_id) DO NOTHING
+                """
+            ),
+            dict(row),
+        )
 
 
 def _run_row(

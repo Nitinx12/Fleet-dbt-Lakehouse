@@ -21,7 +21,7 @@ help:
 	@echo   make py-test     pytest
 	@echo   make check       lint-fast and py-test
 	@echo   make env-check   fail if a required env var is missing
-	@echo   make db-init     run sql/scripts/01 to 05 in order
+	@echo   make db-init     run sql/scripts/01 to 06 in order
 	@echo   make ingest      extract MySQL and MongoDB sources into bronze
 	@echo   make clean       remove __pycache__ and .pytest_cache
 	@echo   make dbt-debug   dbt debug (loads .env)
@@ -57,6 +57,7 @@ db-init:
 	$(PSQL) -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 -f sql/scripts/03_control_pipeline_registry.sql
 	$(PSQL) -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 -f sql/scripts/04_control_batch_tracking.sql
 	$(PSQL) -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 -f sql/scripts/05_control_watermarks.sql
+	$(PSQL) -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 -f sql/scripts/06_audit_relationships.sql
 
 ingest:
 	$(UV) run python scripts/ingestion.py

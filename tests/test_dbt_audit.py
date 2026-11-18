@@ -146,6 +146,46 @@ def test_invocation_started_at_is_timezone_aware() -> None:
 
 
 @pytest.mark.unit
+def test_invocation_row_maps_every_field() -> None:
+    started = datetime(2026, 11, 18, 5, 55, 12, tzinfo=UTC)
+    row = dbt_audit._invocation_row(
+        invocation_id="inv-1",
+        batch_id=7,
+        command="run",
+        dbt_target="dev",
+        started_at=started,
+        exit_code=0,
+    )
+
+    assert row == {
+        "invocation_id": "inv-1",
+        "batch_id": 7,
+        "dbt_command": "run",
+        "dbt_target": "dev",
+        "started_at": started,
+        "exit_code": 0,
+    }
+
+
+@pytest.mark.unit
+def test_missing_invocation_id_writes_nothing(tmp_path: Path) -> None:
+    _write_artifacts(
+        tmp_path,
+        invocation_started_at="2026-11-18T05:55:12.639947Z",
+        which="run",
+        invocation_id="",
+    )
+
+    written = dbt_audit.audit_invocation(
+        tmp_path,
+        started_after=datetime(2026, 1, 1, tzinfo=UTC),
+        exit_code=0,
+    )
+
+    assert written == (0, 0)
+
+
+@pytest.mark.unit
 def test_missing_artifacts_write_nothing(tmp_path: Path) -> None:
     written = dbt_audit.audit_invocation(
         tmp_path,
@@ -190,14 +230,20 @@ def test_non_data_commands_write_nothing(tmp_path: Path) -> None:
     assert written == (0, 0)
 
 
-def _write_artifacts(dbt_dir: Path, *, invocation_started_at: str, which: str) -> None:
+def _write_artifacts(
+    dbt_dir: Path,
+    *,
+    invocation_started_at: str,
+    which: str,
+    invocation_id: str = "inv-9",
+) -> None:
     target = dbt_dir / "target"
     target.mkdir(parents=True)
     (target / "run_results.json").write_text(
         json.dumps(
             {
                 "metadata": {
-                    "invocation_id": "inv-9",
+                    "invocation_id": invocation_id,
                     "invocation_started_at": invocation_started_at,
                 },
                 "args": {"which": which},
