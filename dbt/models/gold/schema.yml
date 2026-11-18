@@ -3,6 +3,7 @@ version: 2
 # Gold layer: star schema.
 # Every dimension has an "Unknown" member (natural id '-1'); facts point at it instead of NULL.
 # Relationship tests are severity: warn because an orphan means a source reference with no dimension row.
+# Column tests mirror silver: same vocabulary, thresholds and null semantics (tests skip NULLs).
 
 models:
 
@@ -13,13 +14,68 @@ models:
     columns:
       - name: date_key
         description: "Primary key, YYYYMMDD integer. -1 = Unknown."
+        data_type: integer
         tests: [unique, not_null]
       - name: date_day
         description: "Calendar date. NULL on the Unknown member."
+        data_type: date
+      - name: year_number
+        description: "Calendar year."
+        data_type: integer
+      - name: quarter_number
+        description: "Calendar quarter, 1-4."
+        data_type: integer
+      - name: quarter_name
+        description: "Q1 ... Q4; Unknown on the Unknown member."
+        data_type: text
+      - name: month_number
+        description: "Month of year, 1-12."
+        data_type: integer
+      - name: month_name
+        description: "Full month name."
+        data_type: text
+      - name: month_short_name
+        description: "Three-letter month abbreviation."
+        data_type: text
+      - name: year_month
+        description: "YYYY-MM label for month partitions."
+        data_type: text
+      - name: iso_year_number
+        description: "ISO-8601 year."
+        data_type: integer
+      - name: iso_week_number
+        description: "ISO-8601 week, 1-53."
+        data_type: integer
+      - name: day_of_month
+        description: "Day of month, 1-31."
+        data_type: integer
+      - name: day_of_year
+        description: "Day of year, 1-366."
+        data_type: integer
+      - name: day_of_week_number
+        description: "ISO day of week, 1 (Monday) to 7 (Sunday)."
+        data_type: integer
       - name: day_name
         description: "Monday ... Sunday."
+        data_type: text
       - name: is_weekend
         description: "Saturday or Sunday."
+        data_type: boolean
+      - name: week_start_date
+        description: "Monday of the ISO week."
+        data_type: date
+      - name: month_start_date
+        description: "First day of the month."
+        data_type: date
+      - name: month_end_date
+        description: "Last day of the month."
+        data_type: date
+      - name: quarter_start_date
+        description: "First day of the quarter."
+        data_type: date
+      - name: year_start_date
+        description: "First day of the year."
+        data_type: date
 
   - name: dim_customers
     description: "Customers, SCD Type 1 (current state only, attributes overwritten)."
@@ -27,24 +83,70 @@ models:
     columns:
       - name: customer_key
         description: "Surrogate key, MD5(customer_id)."
+        data_type: text
         tests: [unique, not_null]
       - name: customer_id
         description: "Natural key from the source system. '-1' = Unknown member."
+        data_type: text
         tests: [unique, not_null]
+      - name: customer_name
+        description: "Customer display name."
+        data_type: text
+        tests:
+          - is_clean_text
       - name: customer_type
+        description: "Spot, Contract or Dedicated; Unknown on the Unknown member."
+        data_type: text
         tests:
           - accepted_values:
               values: ['Spot', 'Contract', 'Dedicated', 'Unknown']
+      - name: credit_terms_days
+        description: "Payment terms in days."
+        data_type: integer
+        tests:
+          - non_negative
+          - within_range:
+              min_value: 15
+              max_value: 60
       - name: credit_terms_band
         description: "Banded credit terms (15-30 / 31-45 / 46-60 days)."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['15-30 days', '31-45 days', '46-60 days', 'Unknown']
+      - name: primary_freight_type
+        description: "Primary freight category from the source; Unknown when missing."
+        data_type: text
       - name: account_status
+        description: "Active or Inactive; Unknown on the Unknown member."
+        data_type: text
         tests:
           - accepted_values:
               values: ['Active', 'Inactive', 'Unknown']
       - name: is_active
         description: "TRUE when account_status is Active; NULL when unknown."
+        data_type: boolean
+      - name: contract_start_date
+        description: "Contract start date; NULL on the Unknown member."
+        data_type: date
+        tests:
+          - not_in_future
       - name: contract_tenure_years
         description: "Years since contract_start_date, as of the last gold run."
+        data_type: numeric
+      - name: annual_revenue_potential
+        description: "Estimated annual revenue potential."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: dim_drivers
     description: "Drivers, SCD Type 1. PII reduced: license number is hashed, date of birth and first/last name are dropped."
@@ -52,36 +154,98 @@ models:
     columns:
       - name: driver_key
         description: "Surrogate key, MD5(driver_id)."
+        data_type: text
         tests: [unique, not_null]
       - name: driver_id
         description: "Natural key from the source system. '-1' = Unknown member."
+        data_type: text
         tests: [unique, not_null]
       - name: full_name
         description: "Display name (PII)."
+        data_type: text
+      - name: hire_date
+        description: "Hire date; NULL on the Unknown member."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: termination_date
+        description: "Termination date; NULL while still employed."
+        data_type: date
+        tests:
+          - not_in_future
       - name: license_number_hash
         description: "Salted SHA-256 of the licence number. Set GOLD_PII_SALT in the environment."
+        data_type: text
+      - name: license_state
+        description: "US state code of the licence; NULL when unknown."
+        data_type: text
+        tests:
+          - is_us_state_code
       - name: age_years
         description: "Age as of the last gold run (derived from date of birth, which is not exposed)."
+        data_type: integer
+        tests:
+          - non_negative
+          - within_range:
+              min_value: 18
+              max_value: 100
       - name: age_band
+        description: "Age bucket."
+        data_type: text
         tests:
           - accepted_values:
               values: ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Unknown']
+      - name: home_terminal
+        description: "Home terminal city; Unknown when missing."
+        data_type: text
       - name: employment_status
+        description: "Employment state from the source."
+        data_type: text
         tests:
           - accepted_values:
               values: ['Active', 'Inactive', 'Terminated', 'On Leave', 'Unknown']
+      - name: is_active
+        description: "TRUE when employment_status is Active; NULL when unknown."
+        data_type: boolean
+      - name: is_employment_consistent
+        description: "TRUE when hire and termination dates agree with employment_status."
+        data_type: boolean
+        tests:
+          - is_true
       - name: cdl_class
+        description: "Commercial licence class."
+        data_type: text
         tests:
           - accepted_values:
               values: ['A', 'B', 'C', 'Unknown']
+      - name: years_experience
+        description: "Years of driving experience."
+        data_type: numeric
+        tests:
+          - non_negative
       - name: experience_band
+        description: "Experience bucket."
+        data_type: text
         tests:
           - accepted_values:
               values: ['<1 year', '1-4 years', '5-9 years', '10-19 years', '20+ years', 'Unknown']
+      - name: tenure_years
+        description: "Years with the current employer."
+        data_type: numeric
+        tests:
+          - non_negative
       - name: tenure_band
+        description: "Tenure bucket."
+        data_type: text
         tests:
           - accepted_values:
               values: ['<1 year', '1-2 years', '3-5 years', '6-10 years', '10+ years', 'Unknown']
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: dim_trucks
     description: "Trucks (current state)."
@@ -89,18 +253,72 @@ models:
     columns:
       - name: truck_key
         description: "Surrogate key, MD5(truck_id)."
+        data_type: text
         tests: [unique, not_null]
       - name: truck_id
         description: "Natural key. '-1' = Unknown member."
+        data_type: text
         tests: [unique, not_null]
+      - name: unit_number
+        description: "Fleet unit number; NULL on the Unknown member."
+        data_type: integer
+      - name: make
+        description: "Truck make; Unknown when missing."
+        data_type: text
+      - name: model_year
+        description: "Model year of the truck."
+        data_type: integer
+      - name: vin
+        description: "Vehicle identification number; Unknown when missing."
+        data_type: text
+      - name: acquisition_date
+        description: "Date the truck was acquired; NULL on the Unknown member."
+        data_type: date
+        tests:
+          - not_in_future
+      - name: acquisition_mileage
+        description: "Odometer reading at acquisition."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: fuel_type
+        description: "Fuel type; Unknown when missing."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Diesel', 'Unknown']
+      - name: tank_capacity_gallons
+        description: "Fuel tank capacity in gallons."
+        data_type: integer
+        tests:
+          - non_negative
       - name: status
+        description: "Availability status."
+        data_type: text
         tests:
           - accepted_values:
               values: ['Active', 'Maintenance', 'Inactive', 'Unknown']
+      - name: is_available
+        description: "TRUE when status is Active; NULL when unknown."
+        data_type: boolean
+      - name: age_years
+        description: "Age in years as of the last gold run."
+        data_type: integer
       - name: age_band
+        description: "Age bucket."
+        data_type: text
         tests:
           - accepted_values:
               values: ['0-2 years', '3-5 years', '6-10 years', '11+ years', 'Unknown']
+      - name: home_terminal
+        description: "Home terminal city; Unknown when missing."
+        data_type: text
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: dim_trailers
     description: "Trailers (current state)."
@@ -108,18 +326,64 @@ models:
     columns:
       - name: trailer_key
         description: "Surrogate key, MD5(trailer_id)."
+        data_type: text
         tests: [unique, not_null]
       - name: trailer_id
         description: "Natural key. '-1' = Unknown member."
+        data_type: text
         tests: [unique, not_null]
+      - name: trailer_number
+        description: "Fleet trailer number; NULL on the Unknown member."
+        data_type: integer
+      - name: trailer_type
+        description: "Trailer body type; Unknown when missing."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Dry Van', 'Refrigerated', 'Unknown']
+      - name: length_feet
+        description: "Trailer length in feet."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: model_year
+        description: "Model year of the trailer."
+        data_type: integer
+      - name: vin
+        description: "Vehicle identification number; Unknown when missing."
+        data_type: text
+      - name: acquisition_date
+        description: "Date the trailer was acquired; NULL on the Unknown member."
+        data_type: date
+        tests:
+          - not_in_future
       - name: status
+        description: "Availability status."
+        data_type: text
         tests:
           - accepted_values:
               values: ['Active', 'Inactive', 'Maintenance', 'Unknown']
+      - name: is_available
+        description: "TRUE when status is Active; NULL when unknown."
+        data_type: boolean
+      - name: age_years
+        description: "Age in years as of the last gold run."
+        data_type: integer
       - name: age_band
+        description: "Age bucket."
+        data_type: text
         tests:
           - accepted_values:
               values: ['0-2 years', '3-5 years', '6-10 years', '11+ years', 'Unknown']
+      - name: current_location
+        description: "Current city; Unknown when missing."
+        data_type: text
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: dim_facilities
     description: "Facilities: terminals, warehouses, cross-docks and distribution centres."
@@ -127,10 +391,64 @@ models:
     columns:
       - name: facility_key
         description: "Surrogate key, MD5(facility_id)."
+        data_type: text
         tests: [unique, not_null]
       - name: facility_id
         description: "Natural key. '-1' = Unknown member."
+        data_type: text
         tests: [unique, not_null]
+      - name: facility_name
+        description: "Facility display name; Unknown when missing."
+        data_type: text
+      - name: facility_type
+        description: "Terminal, warehouse, cross-dock or distribution centre."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Cross-Dock', 'Distribution Center', 'Terminal', 'Warehouse', 'Unknown']
+      - name: city
+        description: "City; NULL on the Unknown member."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: state
+        description: "US state code; NULL when unknown."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: city_state
+        description: "city || ', ' || state for display."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: latitude
+        description: "Latitude in decimal degrees."
+        data_type: numeric
+        tests:
+          - within_range:
+              min_value: -90
+              max_value: 90
+      - name: longitude
+        description: "Longitude in decimal degrees."
+        data_type: numeric
+        tests:
+          - within_range:
+              min_value: -180
+              max_value: 180
+      - name: dock_doors
+        description: "Number of dock doors."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: operating_hours
+        description: "Operating hours text; Unknown when missing."
+        data_type: text
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: dim_routes
     description: "Lanes (origin to destination) with rate card and typical distance."
@@ -138,15 +456,78 @@ models:
     columns:
       - name: route_key
         description: "Surrogate key, MD5(route_id)."
+        data_type: text
         tests: [unique, not_null]
       - name: route_id
         description: "Natural key. '-1' = Unknown member."
+        data_type: text
         tests: [unique, not_null]
+      - name: origin_city
+        description: "Origin city; NULL on the Unknown member."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: origin_state
+        description: "Origin US state code; NULL when unknown."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: destination_city
+        description: "Destination city; NULL on the Unknown member."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: destination_state
+        description: "Destination US state code; NULL when unknown."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: lane_name
+        description: "Display label: origin to destination."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: is_intrastate
+        description: "TRUE when origin and destination states match; NULL when either is unknown."
+        data_type: boolean
+      - name: typical_distance_miles
+        description: "Typical lane distance in miles."
+        data_type: integer
+        tests:
+          - non_negative
       - name: haul_type
         description: "Short (<250 mi), Medium (250-999 mi), Long (1000+ mi)."
+        data_type: text
         tests:
           - accepted_values:
               values: ['Short Haul', 'Medium Haul', 'Long Haul', 'Unknown']
+      - name: base_rate_per_mile
+        description: "Base rate per mile."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: fuel_surcharge_rate
+        description: "Fuel surcharge per mile."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: typical_transit_days
+        description: "Typical transit time in days."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: base_lane_revenue
+        description: "typical_distance_miles * base_rate_per_mile."
+        data_type: numeric
+        tests:
+          - max_scale:
+              max_digits: 2
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   # ================================================================ FACTS
   - name: fct_loads
@@ -155,30 +536,91 @@ models:
     columns:
       - name: load_key
         description: "Primary key, MD5(load_id)."
+        data_type: text
         tests: [unique, not_null]
       - name: load_id
         description: "Degenerate dimension."
+        data_type: text
         tests: [not_null]
       - name: customer_key
+        description: "FK into dim_customers; -1 when the customer is unknown."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_customers')", field: customer_key, config: {severity: warn}}
       - name: route_key
+        description: "FK into dim_routes; -1 when the lane is unknown."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_routes')", field: route_key, config: {severity: warn}}
       - name: load_date_key
+        description: "FK into dim_date (load date)."
+        data_type: integer
         tests:
           - not_null
           - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: load_type
+        description: "Trailer type used for the load."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Dry Van', 'Refrigerated', 'Flatbed', 'Tanker', 'Unknown']
       - name: load_status
+        description: "Load lifecycle status."
+        data_type: text
         tests:
           - accepted_values:
               values: ['Completed', 'In Transit', 'Delivered', 'Cancelled', 'Booked', 'Unknown']
+      - name: booking_type
+        description: "Dedicated, Contract or Spot booking."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Dedicated', 'Contract', 'Spot', 'Unknown']
+      - name: is_cancelled
+        description: "TRUE when load_status is Cancelled; NULL when unknown."
+        data_type: boolean
+      - name: weight_lbs
+        description: "Load weight in pounds."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: pieces
+        description: "Number of pieces on the load."
+        data_type: integer
+        tests:
+          - non_negative
       - name: revenue
-        tests: [non_negative]
+        description: "Line-haul revenue."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: fuel_surcharge
+        description: "Fuel surcharge amount."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: accessorial_charges
+        description: "Extra charges (detention, waiting time, extras)."
+        data_type: numeric
+        tests:
+          - non_negative
       - name: total_charges
         description: "revenue + fuel_surcharge + accessorial_charges; NULL when any component is unknown."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: fct_trips
     description: "Grain: one row per trip. customer_key and route_key are inherited from the parent load."
@@ -186,8 +628,18 @@ models:
     columns:
       - name: trip_key
         description: "Primary key, MD5(trip_id)."
+        data_type: text
         tests: [unique, not_null]
+      - name: trip_id
+        description: "Degenerate dimension."
+        data_type: text
+        tests: [not_null]
+      - name: load_id
+        description: "Parent load id; NULL when the trip has no load."
+        data_type: text
       - name: load_key
+        description: "FK into fct_loads; -1 when the load is unknown."
+        data_type: text
         tests:
           - not_null
           - relationships:
@@ -195,31 +647,96 @@ models:
               field: load_key
               config: {severity: warn, where: "load_id IS NOT NULL"}
       - name: driver_key
+        description: "FK into dim_drivers; -1 when the driver is unknown."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
       - name: truck_key
+        description: "FK into dim_trucks; -1 when the truck is unknown."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
       - name: trailer_key
+        description: "FK into dim_trailers; -1 when the trailer is unknown."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_trailers')", field: trailer_key, config: {severity: warn}}
       - name: customer_key
+        description: "FK into dim_customers, inherited from the parent load."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_customers')", field: customer_key, config: {severity: warn}}
       - name: route_key
+        description: "FK into dim_routes, inherited from the parent load."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_routes')", field: route_key, config: {severity: warn}}
       - name: dispatch_date_key
+        description: "FK into dim_date (dispatch date)."
+        data_type: integer
         tests:
           - not_null
           - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: trip_status
+        description: "Trip lifecycle status."
+        data_type: text
+        tests:
+          - accepted_values:
+              values: ['Completed', 'In Transit', 'Planned', 'Cancelled', 'Unknown']
+      - name: actual_distance_miles
+        description: "Actual distance driven in miles."
+        data_type: integer
+        tests:
+          - non_negative
+      - name: actual_duration_hours
+        description: "Actual trip duration in hours."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: fuel_gallons_used
+        description: "Fuel used on the trip."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: idle_time_hours
+        description: "Engine idle time in hours."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: average_mpg
+        description: "Average miles per gallon reported by the truck."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: calculated_mpg
+        description: "actual_distance_miles / fuel_gallons_used; NULL when fuel is unknown or zero."
+        data_type: numeric
+      - name: is_mpg_consistent
+        description: "TRUE when average_mpg and calculated_mpg agree within tolerance."
+        data_type: boolean
+        tests:
+          - is_true
+      - name: idle_share_of_duration
+        description: "idle_time_hours / actual_duration_hours, 0 to 1."
+        data_type: numeric
+        tests:
+          - within_range:
+              min_value: 0
+              max_value: 1
       - name: average_speed_mph
         description: "actual_distance_miles / actual_duration_hours. Non-additive."
+        data_type: numeric
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: fct_delivery_events
     description: "Grain: one row per delivery event. driver/truck come from the parent trip, customer from the parent load."
@@ -227,35 +744,107 @@ models:
     columns:
       - name: event_key
         description: "Primary key, MD5(event_id)."
+        data_type: text
         tests: [unique, not_null]
+      - name: event_id
+        description: "Degenerate dimension."
+        data_type: text
+        tests: [not_null]
+      - name: trip_id
+        description: "Parent trip id; NULL when the event has no trip."
+        data_type: text
+      - name: load_id
+        description: "Parent load id, resolved via the trip when the event omits it; NULL when unknown."
+        data_type: text
+      - name: trip_key
+        description: "FK into fct_trips; -1 when the trip is unknown."
+        data_type: text
+      - name: load_key
+        description: "FK into fct_loads; -1 when the load is unknown."
+        data_type: text
       - name: facility_key
+        description: "FK into dim_facilities; -1 when the facility is unknown."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_facilities')", field: facility_key, config: {severity: warn}}
       - name: driver_key
+        description: "FK into dim_drivers, inherited from the trip."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
       - name: truck_key
+        description: "FK into dim_trucks, inherited from the trip."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
       - name: customer_key
+        description: "FK into dim_customers, inherited from the load."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_customers')", field: customer_key, config: {severity: warn}}
       - name: scheduled_date_key
         description: "Role-playing key into dim_date (scheduled)."
+        data_type: integer
         tests:
           - not_null
           - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
       - name: actual_date_key
         description: "Role-playing key into dim_date (actual). -1 when no actual time."
+        data_type: integer
         tests:
           - not_null
           - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: event_type
+        description: "PICKUP or DELIVERY; Unknown when missing."
+        data_type: text
+      - name: scheduled_datetime
+        description: "Scheduled event time (UTC)."
+        data_type: timestamp without time zone
+      - name: actual_datetime
+        description: "Actual time (UTC)."
+        data_type: timestamp without time zone
+        tests:
+          - not_in_future:
+              tolerance_days: 1
+      - name: location_city
+        description: "City of the event; NULL when unknown."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: location_state
+        description: "US state code of the event; NULL when unknown."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: on_time_flag
+        description: "TRUE when the event was on time; NULL when unknown."
+        data_type: boolean
+      - name: has_detention
+        description: "TRUE when the event recorded detention."
+        data_type: boolean
+      - name: delay_minutes
+        description: "Minutes early (negative) or late relative to schedule."
+        data_type: numeric
       - name: detention_minutes
-        tests: [non_negative]
+        description: "Detention minutes at the facility."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: detention_hours
+        description: "Detention minutes / 60."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: fct_fuel_purchases
     description: "Grain: one row per fuel purchase. Fuel card number is masked."
@@ -263,25 +852,89 @@ models:
     columns:
       - name: fuel_purchase_key
         description: "Primary key, MD5(fuel_purchase_id)."
+        data_type: text
         tests: [unique, not_null]
+      - name: fuel_purchase_id
+        description: "Degenerate dimension."
+        data_type: text
+        tests: [not_null]
+      - name: trip_id
+        description: "Parent trip id; NULL when the purchase has no trip."
+        data_type: text
+      - name: trip_key
+        description: "FK into fct_trips; -1 when the trip is unknown."
+        data_type: text
       - name: truck_key
+        description: "FK into dim_trucks, inherited from the trip."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
       - name: driver_key
+        description: "FK into dim_drivers, inherited from the trip."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
       - name: purchase_date_key
+        description: "FK into dim_date (purchase date)."
+        data_type: integer
         tests:
           - not_null
           - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: purchase_datetime
+        description: "Purchase timestamp (UTC)."
+        data_type: timestamp without time zone
+        tests:
+          - not_in_future:
+              tolerance_days: 1
+      - name: location_city
+        description: "City of the station; NULL when unknown."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: location_state
+        description: "US state code of the station; NULL when unknown."
+        data_type: text
+        tests:
+          - is_us_state_code
       - name: fuel_card_masked
         description: "Fuel card number with all but the last 4 characters replaced by *."
+        data_type: text
       - name: gallons
-        tests: [non_negative]
+        description: "Fuel volume purchased."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: price_per_gallon
+        description: "Unit price per gallon."
+        data_type: numeric
+        tests:
+          - non_negative
       - name: total_cost
-        tests: [non_negative]
+        description: "Reported total cost of the purchase."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: calculated_total_cost
+        description: "gallons * price_per_gallon."
+        data_type: numeric
+        tests:
+          - max_scale:
+              max_digits: 2
+      - name: is_total_cost_consistent
+        description: "TRUE when total_cost and calculated_total_cost agree within tolerance."
+        data_type: boolean
+        tests:
+          - is_true
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: fct_maintenance
     description: "Grain: one row per maintenance work order."
@@ -289,19 +942,93 @@ models:
     columns:
       - name: maintenance_key
         description: "Primary key, MD5(maintenance_id)."
+        data_type: text
         tests: [unique, not_null]
+      - name: maintenance_id
+        description: "Degenerate dimension."
+        data_type: text
+        tests: [not_null]
       - name: truck_key
+        description: "FK into dim_trucks; -1 when the truck is unknown."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
       - name: maintenance_date_key
+        description: "FK into dim_date (maintenance date)."
+        data_type: integer
         tests:
           - not_null
           - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: maintenance_type
+        description: "Service category; Unknown when missing."
+        data_type: text
+      - name: facility_location
+        description: "City where the work was done; Unknown when missing."
+        data_type: text
+      - name: service_description
+        description: "Short work-order summary; Unknown when missing."
+        data_type: text
+      - name: odometer_reading
+        description: "Odometer at service time."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: labour_hours
+        description: "Billable labour hours."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: labour_cost
+        description: "Labour cost."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: parts_cost
+        description: "Parts cost."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
       - name: total_cost
-        tests: [non_negative]
+        description: "Reported total cost of the work order."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: calculated_total_cost
+        description: "labour_cost + parts_cost."
+        data_type: numeric
+        tests:
+          - max_scale:
+              max_digits: 2
+      - name: is_total_cost_consistent
+        description: "TRUE when total_cost and calculated_total_cost agree within tolerance."
+        data_type: boolean
+        tests:
+          - is_true
+      - name: labour_cost_per_hour
+        description: "labour_cost / labour_hours; NULL when labour_hours is zero or unknown."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
       - name: downtime_hours
-        tests: [non_negative]
+        description: "Hours the truck was out of service."
+        data_type: numeric
+        tests:
+          - non_negative
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
 
   - name: fct_safety_incidents
     description: "Grain: one row per safety incident. Free-text description is excluded (PII)."
@@ -309,18 +1036,91 @@ models:
     columns:
       - name: incident_key
         description: "Primary key, MD5(incident_id)."
+        data_type: text
         tests: [unique, not_null]
+      - name: incident_id
+        description: "Degenerate dimension."
+        data_type: text
+        tests: [not_null]
+      - name: trip_id
+        description: "Parent trip id; NULL when the incident has no trip."
+        data_type: text
+      - name: trip_key
+        description: "FK into fct_trips; -1 when the trip is unknown."
+        data_type: text
       - name: driver_key
+        description: "FK into dim_drivers, inherited from the trip."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
       - name: truck_key
+        description: "FK into dim_trucks, inherited from the trip."
+        data_type: text
         tests:
           - not_null
           - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
       - name: incident_date_key
+        description: "FK into dim_date (incident date)."
+        data_type: integer
         tests:
           - not_null
           - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: incident_type
+        description: "Incident category; Unknown when missing."
+        data_type: text
+      - name: location_city
+        description: "City of the incident; NULL when unknown."
+        data_type: text
+        tests:
+          - is_clean_text
+      - name: location_state
+        description: "US state code of the incident; NULL when unknown."
+        data_type: text
+        tests:
+          - is_us_state_code
+      - name: at_fault_flag
+        description: "TRUE when the driver was at fault; NULL when unknown."
+        data_type: boolean
+      - name: injury_flag
+        description: "TRUE when someone was injured; NULL when unknown."
+        data_type: boolean
+      - name: preventable_flag
+        description: "TRUE when the incident was preventable; NULL when unknown."
+        data_type: boolean
+      - name: has_claim
+        description: "TRUE when a claim amount was recorded; NULL when the amount is unknown."
+        data_type: boolean
+      - name: vehicle_damage_cost
+        description: "Vehicle damage cost."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: cargo_damage_cost
+        description: "Cargo damage cost."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
       - name: total_damage_cost
         description: "vehicle_damage_cost + cargo_damage_cost; NULL when either is unknown."
+        data_type: numeric
+        tests:
+          - max_scale:
+              max_digits: 2
+      - name: claim_amount
+        description: "Insurance claim amount."
+        data_type: numeric
+        tests:
+          - non_negative
+          - max_scale:
+              max_digits: 2
+      - name: silver_loaded_at
+        description: "Timestamp the silver row was loaded (UTC)."
+        data_type: timestamp with time zone
+      - name: gold_loaded_at
+        description: "Timestamp this gold row was built (UTC)."
+        data_type: timestamp with time zone
