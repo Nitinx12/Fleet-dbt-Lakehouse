@@ -11,6 +11,9 @@ models:
     gold:
       +schema: gold
       +materialized: table
+    marts:
+      +schema: marts
+      +materialized: table
 
 vars:
   silver_lookback_hours: 24

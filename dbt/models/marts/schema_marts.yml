@@ -1,0 +1,215 @@
+version: 2
+
+# Gold marts: pre-aggregated, denormalised, incremental tables for BI.
+# Every mart has a single-column surrogate key (mart_key) over its grain, the dimension keys it was built from
+# (so BI can still join to the dim_* tables), denormalised dimension attributes, additive measures and a few
+# row-level ratios. Ratios are NOT additive: roll up from the additive columns named in each model's header.
+# Relationship tests are severity: warn, same convention as the facts.
+
+models:
+
+  - name: mart_sales_daily
+    description: >
+      Revenue mart. Grain: load date x customer x route (lane). Source: fct_loads.
+      Use for revenue, volume, lane and customer-mix dashboards.
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false, bi_domain: sales}
+    columns:
+      - name: mart_key
+        description: "Primary key, MD5 over (load_date_key, customer_key, route_key)."
+        tests: [unique, not_null]
+      - name: load_date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: customer_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_customers')", field: customer_key, config: {severity: warn}}
+      - name: route_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_routes')", field: route_key, config: {severity: warn}}
+      - name: loads_count
+        description: "Number of loads in the group."
+        tests: [non_negative]
+      - name: revenue
+        description: "Sum of load revenue (includes cancelled loads; see revenue_excl_cancelled)."
+        tests: [non_negative]
+      - name: total_charges
+        description: "Sum of total_charges. Loads with an unknown component are excluded from the sum (counted in loads_with_unknown_charges)."
+      - name: total_typical_miles
+        description: "loads_count x the lane's typical distance. Denominator for revenue_per_typical_mile."
+      - name: avg_revenue_per_load
+        description: "Non-additive. SUM(revenue) / SUM(loads_count) when rolling up."
+      - name: cancellation_rate
+        description: "Non-additive. SUM(cancelled_loads) / SUM(loads_count) when rolling up."
+      - name: source_gold_loaded_at
+        description: "Latest fct_loads.gold_loaded_at in the group. Incremental watermark."
+      - name: dim_hash
+        description: "Fingerprint of the denormalised customer / lane attributes. A change triggers a re-compute of the row."
+
+  - name: mart_equipment_utilization_daily
+    description: >
+      Fleet utilisation mart. Grain: dispatch date x truck x trailer. Source: fct_trips.
+      Use for miles, hours, MPG, speed and idle dashboards by equipment.
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false, bi_domain: fleet}
+    columns:
+      - name: mart_key
+        description: "Primary key, MD5 over (dispatch_date_key, truck_key, trailer_key)."
+        tests: [unique, not_null]
+      - name: dispatch_date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: truck_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
+      - name: trailer_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trailers')", field: trailer_key, config: {severity: warn}}
+      - name: trips_count
+        tests: [non_negative]
+      - name: distance_miles
+        tests: [non_negative]
+      - name: mpg_miles
+        description: "Miles on trips where fuel and distance are both known. Numerator for fleet_mpg."
+      - name: mpg_gallons
+        description: "Gallons on the same trips as mpg_miles. Denominator for fleet_mpg."
+      - name: speed_miles
+        description: "Miles on trips with known distance and duration > 0. Numerator for avg_speed_mph."
+      - name: speed_hours
+        description: "Hours on the same trips as speed_miles. Denominator for avg_speed_mph."
+      - name: fleet_mpg
+        description: "Non-additive. SUM(mpg_miles) / SUM(mpg_gallons) when rolling up."
+      - name: avg_speed_mph
+        description: "Non-additive. SUM(speed_miles) / SUM(speed_hours) when rolling up."
+      - name: idle_share
+        description: "Non-additive. SUM(idle_hours) / SUM(duration_hours) when rolling up."
+      - name: source_gold_loaded_at
+        description: "Latest fct_trips.gold_loaded_at in the group. Incremental watermark."
+
+  - name: mart_delivery_performance_daily
+    description: >
+      Delivery / on-time performance mart. Grain: scheduled date x facility x event type.
+      Source: fct_delivery_events. Use for OTIF, delay, dwell and detention dashboards by facility.
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false, bi_domain: service}
+    columns:
+      - name: mart_key
+        description: "Primary key, MD5 over (scheduled_date_key, facility_key, event_type)."
+        tests: [unique, not_null]
+      - name: scheduled_date_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_date')", field: date_key, config: {severity: warn}}
+      - name: facility_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_facilities')", field: facility_key, config: {severity: warn}}
+      - name: events_count
+        tests: [non_negative]
+      - name: open_events
+        description: "Events with no actual time yet."
+      - name: on_time_known_events
+        description: "Events where on_time_flag is known. Denominator for on_time_rate."
+      - name: on_time_rate
+        description: "Non-additive. SUM(on_time_events) / SUM(on_time_known_events) when rolling up."
+      - name: avg_delay_minutes
+        description: "Non-additive. SUM(delay_minutes_sum) / SUM(delay_minutes_count) when rolling up."
+      - name: detention_minutes
+        tests: [non_negative]
+      - name: source_gold_loaded_at
+        description: "Latest fct_delivery_events.gold_loaded_at in the group. Incremental watermark."
+
+  - name: mart_driver_scorecard_monthly
+    description: >
+      Driver scorecard. Grain: month x driver. Sources: fct_trips, fct_delivery_events, fct_fuel_purchases,
+      fct_safety_incidents. Use for safety, on-time, fuel-efficiency and productivity leaderboards.
+      Carries the driver display name (PII) from dim_drivers.
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: true, bi_domain: drivers}
+    columns:
+      - name: mart_key
+        description: "Primary key, MD5 over (month_key, driver_key)."
+        tests: [unique, not_null]
+      - name: month_key
+        description: "YYYYMM integer. -1 = facts with an Unknown date."
+        tests: [not_null]
+      - name: driver_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_drivers')", field: driver_key, config: {severity: warn}}
+      - name: driver_name
+        description: "Display name from dim_drivers (PII)."
+      - name: distance_miles
+        tests: [non_negative]
+      - name: fuel_cost
+        tests: [non_negative]
+      - name: incidents_count
+        tests: [non_negative]
+      - name: on_time_rate
+        description: "Non-additive. SUM(on_time_events) / SUM(on_time_known_events) when rolling up."
+      - name: fleet_mpg
+        description: "Non-additive. SUM(mpg_miles) / SUM(mpg_gallons) when rolling up."
+      - name: incidents_per_million_miles
+        description: "Non-additive. SUM(incidents_count) * 1,000,000 / SUM(distance_miles) when rolling up."
+      - name: source_gold_loaded_at
+        description: "Latest gold_loaded_at across the four source facts for the row. Incremental watermark."
+
+  - name: mart_customer_service_monthly
+    description: >
+      Customer 360. Grain: month x customer. Sources: fct_loads, fct_trips, fct_delivery_events.
+      Each fact is bucketed by its own date. Use for account health, revenue, on-time and detention dashboards.
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false, bi_domain: customers}
+    columns:
+      - name: mart_key
+        description: "Primary key, MD5 over (month_key, customer_key)."
+        tests: [unique, not_null]
+      - name: month_key
+        description: "YYYYMM integer. -1 = facts with an Unknown date."
+        tests: [not_null]
+      - name: customer_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_customers')", field: customer_key, config: {severity: warn}}
+      - name: loads_count
+        tests: [non_negative]
+      - name: revenue
+        tests: [non_negative]
+      - name: on_time_rate
+        description: "Non-additive. SUM(on_time_events) / SUM(on_time_known_events) when rolling up."
+      - name: cancellation_rate
+        description: "Non-additive. SUM(cancelled_loads) / SUM(loads_count) when rolling up."
+      - name: revenue_per_trip_mile
+        description: "Non-additive indicator. Revenue is bucketed by load month and miles by dispatch month, so this is not a per-load margin."
+      - name: source_gold_loaded_at
+        description: "Latest gold_loaded_at across the three source facts for the row. Incremental watermark."
+
+  - name: mart_truck_cost_monthly
+    description: >
+      Truck operating-cost mart. Grain: month x truck. Sources: fct_fuel_purchases, fct_maintenance,
+      fct_safety_incidents, fct_trips. Use for cost per mile, maintenance burden and downtime dashboards.
+    meta: {owner: data-engineering, tier: gold, serve: true, contains_pii: false, bi_domain: fleet}
+    columns:
+      - name: mart_key
+        description: "Primary key, MD5 over (month_key, truck_key)."
+        tests: [unique, not_null]
+      - name: month_key
+        description: "YYYYMM integer. -1 = facts with an Unknown date."
+        tests: [not_null]
+      - name: truck_key
+        tests:
+          - not_null
+          - relationships: {to: "ref('dim_trucks')", field: truck_key, config: {severity: warn}}
+      - name: fuel_cost
+        tests: [non_negative]
+      - name: maintenance_cost
+        tests: [non_negative]
+      - name: downtime_hours
+        tests: [non_negative]
+      - name: total_operating_cost
+        description: "fuel_cost + maintenance_cost + damage_cost, unknown components treated as 0."
+      - name: operating_cost_per_mile
+        description: "Non-additive. SUM(total_operating_cost) / SUM(distance_miles) when rolling up. NULL when the truck has no trip miles in the month."
+      - name: source_gold_loaded_at
+        description: "Latest gold_loaded_at across the four source facts for the row. Incremental watermark."
