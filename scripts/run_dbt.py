@@ -1,7 +1,5 @@
 """Load .env and invoke dbt with the given arguments."""
 
-
-import os
 import subprocess
 import sys
 from pathlib import Path
