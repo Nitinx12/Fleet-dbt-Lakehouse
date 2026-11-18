@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from utils.audit import (
     AuditError,
     TaskHandle,
+    error_summary,
     finish_task,
     log_data_quality,
     log_dbt_results,
@@ -91,6 +92,13 @@ def test_task_handle_carries_rows_processed() -> None:
     assert handle.task_log_id == 7
 
 
+@pytest.mark.unit
+def test_error_summary_does_not_persist_exception_text() -> None:
+    error = ValueError("source value must not reach audit")
+
+    assert error_summary(error, "ingestion") == "ingestion failed (ValueError)"
+
+
 @pytest.mark.integration
 def test_round_trip_rolls_back_cleanly() -> None:
     from uuid import uuid4
@@ -164,7 +172,7 @@ def test_round_trip_rolls_back_cleanly() -> None:
                 .first()
             )
             assert failed["status"] == "FAILED"
-            assert failed["error_message"] == "ValueError: boom"
+            assert failed["error_message"] == "task failed (ValueError)"
 
             assert (
                 start_task(

@@ -106,7 +106,7 @@ check-version: check-tools check-venv
 	$(Q)actual="$$("$(UV)" run --no-sync python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')"; expected="$$(tr -d '\r\n' < "$(PYTHON_VERSION_FILE)")"; if [ "$$actual" != "$$expected" ]; then printf '%s\n' "warning: Python $$actual is installed; $(PYTHON_VERSION_FILE) pins $$expected." >&2; fi
 
 ## Quality
-.PHONY: lint-fast lint fmt format py-test test check ci
+.PHONY: lint-fast lint fmt format py-test test check ci verify
 lint-fast: check-version ## Run Ruff lint and formatting checks.
 	$(Q)printf '%s\n' "==> Running Ruff checks"
 	$(Q)"$(UV)" run --no-sync ruff check .
@@ -127,9 +127,11 @@ py-test: check-version ## Run the Python test suite.
 
 test: py-test ## Alias for py-test.
 
-check: lint-fast py-test ## Run all evidenced local Python quality checks.
+verify: lint-fast py-test ## Run all non-destructive local quality checks.
 
-ci: lint-fast py-test ## Run the checks supported by the tracked repository.
+check: verify ## Alias for verify.
+
+ci: verify ## Run the checks supported by the tracked repository.
 
 ## Environment
 .PHONY: env-check

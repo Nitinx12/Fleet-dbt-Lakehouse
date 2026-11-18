@@ -38,6 +38,11 @@ class AuditError(RuntimeError):
     """Raised when an audit row would violate a table constraint."""
 
 
+def error_summary(error: BaseException, operation: str) -> str:
+    """Return a non-sensitive failure summary suitable for an audit row."""
+    return f"{operation} failed ({type(error).__name__})"
+
+
 @dataclass
 class TaskHandle:
     """Mutable: set rows_processed before the with-block ends."""
@@ -178,11 +183,11 @@ def task_run(
     try:
         yield handle
     except Exception as error:
-        log.exception("audit task %s failed", task_id)
+        log.error("audit task %s failed (%s)", task_id, type(error).__name__)
         finish_task(
             task_log_id,
             "FAILED",
-            error_message=f"{type(error).__name__}: {error}",
+            error_message=error_summary(error, "task"),
             target=target,
         )
         raise
@@ -417,7 +422,7 @@ def log_error(
     with _as_transaction(target) as connection:
         error_id = int(connection.execute(sql, params).scalar_one())
 
-    log.error("audit.error_log %s: %s", error_id, error_message)
+    log.error("audit.error_log %s written for %s", error_id, component.upper())
     return error_id
 
 

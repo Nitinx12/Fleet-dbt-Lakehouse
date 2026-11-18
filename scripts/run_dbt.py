@@ -40,8 +40,8 @@ def audit_invocation(started: datetime, exit_code: int, dbt_target: str) -> None
             exit_code=exit_code,
             dbt_target=dbt_target,
         )
-    except Exception:
-        log.exception("dbt audit load failed")
+    except Exception as error:  # noqa: BLE001 - dbt's exit code must be preserved
+        log.error("dbt audit load failed (%s)", type(error).__name__)
 
 
 def _dbt_target(argv: list[str]) -> str:

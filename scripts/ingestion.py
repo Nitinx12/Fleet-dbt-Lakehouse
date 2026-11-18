@@ -10,8 +10,10 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+from pymongo.errors import PyMongoError
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # direct script run
 
@@ -402,23 +404,38 @@ def _ensure_bronze(pg: Engine, spec: Source, types: dict[str, str]) -> None:
                         f"ADD COLUMN {name} {types[name]}"
                     )
                 )
-        has_primary_key = conn.execute(
+        _ensure_bronze_primary_key(conn, spec)
+
+
+def _ensure_bronze_primary_key(connection: Any, spec: Source) -> None:
+    """Ensure the bronze key agrees with the contract used for upserts."""
+    actual = tuple(
+        connection.execute(
             text(
-                "SELECT EXISTS ("
-                "SELECT 1 FROM pg_index i "
+                "SELECT a.attname "
+                "FROM pg_index i "
                 "JOIN pg_class c ON c.oid = i.indrelid "
                 "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "JOIN unnest(i.indkey) WITH ORDINALITY AS k(attnum, position) ON TRUE "
+                "JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = k.attnum "
                 "WHERE i.indisprimary AND n.nspname = 'bronze' "
-                "AND c.relname = :table)"
+                "AND c.relname = :table "
+                "ORDER BY k.position"
             ),
             {"table": spec.target},
-        ).scalar()
-        if not has_primary_key:
-            conn.execute(
-                text(
-                    f"ALTER TABLE bronze.{spec.target} ADD PRIMARY KEY ({primary_key})"
-                )
-            )
+        ).scalars()
+    )
+    if not actual:
+        primary_key = ", ".join(spec.pk)
+        connection.execute(
+            text(f"ALTER TABLE bronze.{spec.target} ADD PRIMARY KEY ({primary_key})")
+        )
+        return
+    if actual != spec.pk:
+        raise ValueError(
+            f"bronze.{spec.target}: primary key {actual} does not match "
+            f"contract key {spec.pk}"
+        )
 
 
 def _extract_mysql(
@@ -699,9 +716,9 @@ def main() -> int:
         _report(pg, batch_id, stats)
         log.info("batch %s SUCCEEDED", batch_id)
         return 0
-    except Exception as error:
-        message = f"{type(error).__name__}: {error}"
-        log.exception("ingestion failed")
+    except (OSError, PyMongoError, SQLAlchemyError, TypeError, ValueError) as error:
+        message = audit.error_summary(error, "ingestion")
+        log.error("ingestion failed (%s)", type(error).__name__)
         audit.log_error(
             component="INGESTION",
             layer="bronze",
