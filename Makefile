@@ -8,26 +8,36 @@ PSQL    ?= psql
 DB_USER ?= postgres
 DB_NAME ?= fleet_warehouse
 
-.PHONY: help install setup lint-fast fmt py-test check env-check db-init ingest clean
+.PHONY: help install setup lint-fast fmt py-test check env-check db-init ingest clean \
+	dbt-debug dbt-seed dbt-silver dbt-silver-tests dbt-gold dbt-gold-tests \
+	dbt-marts dbt-marts-tests dbt-snapshots dbt-build dbt-test dbt-run
 
 help:
 	@echo.
 	@echo Fleet dbt Warehouse - make targets
 	@echo.
-	@echo   make install     uv sync --frozen, creates .venv
-	@echo   make setup       alias for install
-	@echo   make lint-fast   ruff check and format check
-	@echo   make fmt         ruff format plus safe autofix
-	@echo   make py-test     pytest
-	@echo   make check       lint-fast and py-test
-	@echo   make env-check   fail if a required env var is missing
-	@echo   make db-init     run sql/scripts/01 to 06 in order
-	@echo   make ingest      extract MySQL and MongoDB sources into bronze
-	@echo   make clean       remove __pycache__ and .pytest_cache
-	@echo   make dbt-debug   dbt debug (loads .env)
-	@echo   make dbt-silver dbt run silver models
+	@echo   make install          uv sync --frozen, creates .venv
+	@echo   make setup            alias for install
+	@echo   make lint-fast        ruff check and format check
+	@echo   make fmt              ruff format plus safe autofix
+	@echo   make py-test          pytest
+	@echo   make check            lint-fast and py-test
+	@echo   make env-check        fail if a required env var is missing
+	@echo   make db-init          run sql/scripts/01 to 06 in order
+	@echo   make ingest           extract MySQL and MongoDB sources into bronze
+	@echo   make clean            remove __pycache__ and .pytest_cache
+	@echo   make dbt-debug        dbt debug (loads .env)
+	@echo   make dbt-seed         dbt seed
+	@echo   make dbt-silver       dbt run silver models
 	@echo   make dbt-silver-tests dbt test silver models
-	@echo   make dbt-run     dbt run all models
+	@echo   make dbt-gold         dbt run gold models
+	@echo   make dbt-gold-tests   dbt test gold models
+	@echo   make dbt-marts        dbt run marts models
+	@echo   make dbt-marts-tests  dbt test marts models
+	@echo   make dbt-snapshots    dbt snapshot
+	@echo   make dbt-build        dbt build (run + test)
+	@echo   make dbt-test         dbt test all models
+	@echo   make dbt-run          dbt run all models
 	@echo.
 
 install:
@@ -68,13 +78,35 @@ clean:
 dbt-debug:
 	$(UV) run python scripts/run_dbt.py debug
 
+dbt-seed:
+	$(UV) run python scripts/run_dbt.py seed
+
 dbt-silver:
 	$(UV) run python scripts/run_dbt.py run --select silver
-
-dbt-run:
-	$(UV) run python scripts/run_dbt.py run
-
 
 dbt-silver-tests:
 	$(UV) run python scripts/run_dbt.py test --select silver
 
+dbt-gold:
+	$(UV) run python scripts/run_dbt.py run --select gold
+
+dbt-gold-tests:
+	$(UV) run python scripts/run_dbt.py test --select gold
+
+dbt-marts:
+	$(UV) run python scripts/run_dbt.py run --select marts
+
+dbt-marts-tests:
+	$(UV) run python scripts/run_dbt.py test --select marts
+
+dbt-snapshots:
+	$(UV) run python scripts/run_dbt.py snapshot
+
+dbt-build:
+	$(UV) run python scripts/run_dbt.py build
+
+dbt-test:
+	$(UV) run python scripts/run_dbt.py test
+
+dbt-run:
+	$(UV) run python scripts/run_dbt.py run
