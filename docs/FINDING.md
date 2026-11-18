@@ -160,11 +160,11 @@
 
 ```bash
 uv sync
-uv run python scripts/_build_eda_notebooks.py   # regenerate notebooks (optional)
-uv run python scripts/_run_eda_notebooks.py     # execute in-place
+make notebooks                                  # execute copies into out/notebooks
 ```
 
-Or open in Jupyter (`uv run jupyter lab`) and run all.
+The target requires local `data/mysql` and `data/mongo` extracts and never modifies
+the tracked notebooks. Or open in Jupyter and run all.
 
 ---
 

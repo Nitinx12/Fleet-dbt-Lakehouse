@@ -48,6 +48,15 @@ def test_verify_dry_run_contains_only_quality_checks() -> None:
 
 
 @pytest.mark.unit
+def test_notebooks_dry_run_executes_the_runner() -> None:
+    """Keep notebook execution behind its own non-mutating target."""
+    dry_run = _make("--dry-run", "notebooks")
+
+    assert "scripts/run_notebooks.py" in dry_run
+    assert "--inplace" not in dry_run
+
+
+@pytest.mark.unit
 def test_destructive_targets_keep_the_confirmation_guard() -> None:
     """Require an explicit confirmation before destructive operations."""
     makefile = MAKEFILE.read_text(encoding="utf-8")

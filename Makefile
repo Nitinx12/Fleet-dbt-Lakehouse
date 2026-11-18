@@ -133,6 +133,11 @@ check: verify ## Alias for verify.
 
 ci: verify ## Run the checks supported by the tracked repository.
 
+## Notebooks
+.PHONY: notebooks
+notebooks: check-version ## Execute EDA notebooks into out/notebooks.
+	$(Q)"$(UV)" run --no-sync python scripts/run_notebooks.py
+
 ## Environment
 .PHONY: env-check
 env-check: check-version ## Verify application-required environment variables.
