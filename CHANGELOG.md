@@ -1,16 +1,71 @@
 # Changelog
 
-## Unreleased
+All notable changes to Fleet-dbt-warehouse are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
+to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-- Rewrite the root `.dockerignore` used by the Airflow image build: exclude local Airflow state, secrets, caches and generated artifacts, and drop the stale `ARCHITECTURE.md` exception.
-- Correct `airflow/.gitignore` to ignore local Airflow logs, metadata databases, generated config and Python caches.
-- Include the generated `out/` directory in `make clean` so notebook and tool output is removed by local cleanup.
-- Add a detailed `airflow/README.md` with stack setup, UI/CLI DAG triggering, the daily task graph, manual per-task commands, audit linkage, troubleshooting and safety rules.
-- Fix `make airflow-test` to run the orchestration suite from `airflow/tests/` with `PYTHONPATH=airflow`, and correct the watchdog test's DAG path.
-- Incrementally publish non-PII Postgres marts to the configured Databricks mart schema, with schema validation, swap recovery tables and audit reconciliation. Large marts load through parallel workers and bounded literal `INSERT` batches so a full publish finishes in minutes, not hours. Successful swaps drop the `__prev` rollback copy instead of retaining it.
-- Document every gold column with a description and `data_type`, and add silver-style tests (`accepted_values`, `non_negative`, `max_scale`, `within_range`, `not_in_future`, `is_true`, `is_clean_text`, `is_us_state_code`, `not_null` on natural ids) across all gold models.
-- Add 13 gold models (7 SCD1 dimensions, `dim_date`, 6 incremental facts) with `gold_helpers` macros and their tests.
-- Load dbt run and test results into `audit.dbt_run_results` and `audit.data_quality_results`, creating a manual `control.batch` for local runs.
-- Add `audit.dbt_invocation`, foreign keys from every audit table to `control.batch`, and `audit.v_batch_summary` / `audit.v_dbt_results` / `audit.v_data_quality_results` views for the audit dashboard.
-- Update Makefile dbt targets for seed, gold, marts, snapshots, build and test runs; target marts models to the `marts` schema.
-- Validate audit layer, target layer, counts and tolerance in `utils.audit` before writing.
+Versions match `pyproject.toml`; releases are cut by pushing a `vX.Y.Z` tag that
+the `release` workflow verifies before publishing. No tag has been cut yet, so
+all current work is listed under `Unreleased`.
+
+## [Unreleased]
+
+### Added
+
+- Airflow orchestration stack: Docker image, compose files, DAGs, helpers,
+  callbacks and operational docs under `airflow/`.
+- Airflow and alert environment settings, plus batch-context support in the
+  ingestion and dbt runner scripts so CLI and DAG runs share one audit trail.
+- Gold layer: 13 models (7 SCD1 dimensions, `dim_date` and 6 incremental facts),
+  `gold_helpers` macros, column descriptions and silver-style tests.
+- Silver layer: seven models, `schema.yml` tests and three generic tests.
+- Databricks publishing for approved non-PII Postgres marts, with schema
+  validation, parallel workers, bounded literal `INSERT` batches, swap recovery
+  tables and audit reconciliation.
+- Audit loaders for dbt run and test results, `audit.dbt_invocation`, foreign
+  keys from every audit table to `control.batch`, and the `v_batch_summary`,
+  `v_dbt_results` and `v_data_quality_results` dashboard views.
+- Read-only `sql/metadata/01..10` scripts for schemas, tables, columns,
+  constraints, indexes, views, sequences, sizes and extensions.
+- `sql/scripts/07_pipeline_event_triggers.sql`: task failures and retries write
+  deduplicated `audit.error_log` rows, while failed or cancelled batches write
+  CONTROL error rows and publish `pg_notify('pipeline_failure', json)` on failure.
+- `tests/test_pipeline_triggers.py` covering both failure triggers end to end.
+- Reproducible notebook runner and generated executed-notebook handling.
+- Detailed `README.md` and `airflow/README.md` covering setup, DAG triggering,
+  the daily task graph, audit linkage and troubleshooting.
+
+### Changed
+
+- `make db-init` now applies `sql/scripts/01..07` in order.
+- `make airflow-up` and `make airflow-down` pass `--env-file .env` while keeping
+  compose-relative build contexts and mounts intact.
+- The Airflow image uses uv `0.5.0`, the Python 3.13 constraints file and a
+  full Dockerfile-owned `PYTHONPATH` covering the project venv and Airflow user
+  site; `airflow/scripts/*.sh` are marked executable at build time.
+- The root `.dockerignore` excludes local Airflow state, secrets, caches and
+  generated artifacts; `airflow/.gitignore` ignores runtime databases, config
+  and Python caches.
+- `make clean` removes the generated `out/` directory.
+- Makefile dbt targets cover seed, silver, gold, marts, snapshots, build and
+  test runs; marts models target the `marts` schema.
+- Databricks connections use tuned retry settings and the configured merge
+  character budget.
+
+### Removed
+
+- Stale references to the placeholder `AIRFLOW.md` and `PROJECT.md` documents
+  from the Airflow README.
+
+### Fixed
+
+- `make airflow-test` runs the orchestration suite from `airflow/tests/` with
+  `PYTHONPATH=airflow`.
+- DAG integrity, daily structure, ingestion tier and watchdog test paths now
+  resolve correctly inside the Airflow image.
+- The Airflow image copies the correctly named `requirments-airflow.txt` file,
+  and `airflow/compose.yml` no longer overrides `PYTHONPATH`.
+- `utils.audit` validates audit labels, target layers, counts and tolerances
+  before writing; task audit rows close on `BaseException`.
+- Earlier Makefile bootstrap and pre-push hook path breakages.
+- Ingestion audit logging and verification were hardened.

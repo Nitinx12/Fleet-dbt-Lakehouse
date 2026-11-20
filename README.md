@@ -64,7 +64,8 @@ fleets/
 │   ├── 03_control_pipeline_registry.sql
 │   ├── 04_control_batch_tracking.sql
 │   ├── 05_control_watermarks.sql
-│   └── 06_audit_relationships.sql
+│   ├── 06_audit_relationships.sql
+│   └── 07_pipeline_event_triggers.sql  #  failure audit + pg_notify alert
 │
 ├── notebooks/                 # EDA notebooks (mysql_eda, mongo_eda)
 ├── docs/                      # design notes (FINDING.md)
@@ -454,7 +455,9 @@ flowchart LR
   running, where each source's watermark sits (with history + regression guard).
 - **`audit.*`** is append-only evidence: every task, dbt invocation, test
   result, reconciliation and error, linked to its `batch_id`.
-- Bootstrap: `make db-init` runs `sql/scripts/01..06` in order.
+- Bootstrap: `make db-init` runs `sql/scripts/01..07` in order. Task failures and
+  batch failures are mirrored into `audit.error_log` by triggers; batch failures
+  also publish `pg_notify('pipeline_failure', json)`.
 
 ---
 
@@ -752,7 +755,7 @@ Rules:
 
 ```bash
 # local stack (from repo root, once compose files are filled in)
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml up -d
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml up -d
 
 # what the daily DAG actually invokes (same as manual runs)
 uv run python scripts/ingestion.py

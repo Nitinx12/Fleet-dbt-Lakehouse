@@ -162,21 +162,23 @@ service, so DAG and helper edits are picked up without rebuilding the image.
 
 ## Start, inspect and stop the stack
 
-Run all commands from the repository root.
+Run all commands from the repository root. `--env-file .env` is required so
+Compose interpolates the root `.env` while keeping the compose-relative build
+context and bind mounts.
 
 ```bash
 # Build and start (also runs airflow-init once)
 make airflow-up
 
 # Check service state
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml ps
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml ps
 
 # Follow logs
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml logs -f airflow-api-server
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml logs -f airflow-scheduler airflow-dag-processor airflow-worker
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml logs -f airflow-api-server
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml logs -f airflow-scheduler airflow-dag-processor airflow-worker
 
 # First-run diagnostics
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml logs airflow-init
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml logs airflow-init
 
 # Stop (keeps the metadata volume)
 make airflow-down
@@ -205,22 +207,22 @@ as the rest of the stack:
 
 ```bash
 # List DAGs
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags list
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags list
 
 # List tasks of the daily DAG
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow tasks list fleet_daily_load
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow tasks list fleet_daily_load
 
 # Unpause so the daily schedule is active
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags unpause fleet_daily_load
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags unpause fleet_daily_load
 
 # Trigger now (Airflow generates the run id)
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags trigger fleet_daily_load
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags trigger fleet_daily_load
 
 # Trigger with a stable, recognisable run id
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags trigger fleet_daily_load --run-id manual_fleet_validation_001
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags trigger fleet_daily_load --run-id manual_fleet_validation_001
 
 # Pause again when finished
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags pause fleet_daily_load
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow dags pause fleet_daily_load
 ```
 
 The `--run-id` value is written to `control.batch.airflow_run_id`, so using a
@@ -229,8 +231,8 @@ descriptive id makes the warehouse rows easy to find.
 Inspect pools and users if setup looks incomplete:
 
 ```bash
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow pools list
-docker compose -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow users list
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow pools list
+docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml exec airflow-scheduler airflow users list
 ```
 
 ---
@@ -415,7 +417,7 @@ PYTHONPATH=airflow uv run --no-sync pytest airflow/tests
 ```
 
 `PYTHONPATH=airflow` is required outside the image so `helpers.*` imports
-resolve; inside the containers it is set by `Dockerfile` and `compose.yml`.
+resolve; inside the containers the full path is set by the `Dockerfile`.
 
 ---
 
