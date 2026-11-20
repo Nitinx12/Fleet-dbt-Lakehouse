@@ -1,7 +1,6 @@
 version: 2
 sources:
   - name: bronze
-    database: fleet_warehouse
     schema: bronze
     description: "This source contains raw data from the Postgres bronze schema."
 

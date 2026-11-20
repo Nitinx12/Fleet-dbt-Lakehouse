@@ -1,0 +1,147 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Commit SHA built by CI
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve-image:
+    name: Resolve immutable image
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      image: ${{ steps.resolve.outputs.image }}
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve digest
+        id: resolve
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            sha="${{ inputs.release_sha }}"
+          else
+            sha="${{ github.event.workflow_run.head_sha }}"
+          fi
+          case "$sha" in
+            *[!0-9a-f]*|"") printf 'invalid release sha\n' >&2; exit 1 ;;
+          esac
+          if [ "${#sha}" -ne 40 ]; then
+            printf 'release sha must be 40 hex characters\n' >&2
+            exit 1
+          fi
+          repository="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          tag="ghcr.io/${repository}:sha-${sha}"
+          digest="$(docker buildx imagetools inspect "$tag" | awk '/Digest:/ {print $2; exit}')"
+          if [ -z "$digest" ]; then
+            printf 'could not resolve digest for %s\n' "$tag" >&2
+            exit 1
+          fi
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+          printf 'image=ghcr.io/%s@%s\n' "$repository" "$digest" >> "$GITHUB_OUTPUT"
+
+  deploy-staging:
+    name: Deploy staging
+    if: github.event_name == 'workflow_run'
+    needs:
+      - resolve-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Deploy staging by digest
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.STAGING_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.STAGING_DEPLOY_PATH }}
+          IMAGE_REF: ${{ needs.resolve-image.outputs.image }}
+        run: make deploy CONFIRM=yes
+
+  smoke-staging:
+    name: Smoke staging
+    if: github.event_name == 'workflow_run'
+    needs:
+      - resolve-image
+      - deploy-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: staging
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Smoke staging
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.STAGING_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.STAGING_DEPLOY_PATH }}
+        run: make deploy-smoke
+
+  deploy-production:
+    name: Deploy production
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - resolve-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Deploy production by digest
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.PRODUCTION_DEPLOY_PATH }}
+          IMAGE_REF: ${{ needs.resolve-image.outputs.image }}
+        run: make deploy CONFIRM=yes
+
+  smoke-production:
+    name: Smoke production
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - resolve-image
+      - deploy-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Smoke production
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.PRODUCTION_DEPLOY_PATH }}
+        run: make deploy-smoke

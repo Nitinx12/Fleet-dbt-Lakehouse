@@ -36,6 +36,20 @@ all current work is listed under `Unreleased`.
   the daily task graph, audit linkage and troubleshooting.
 - `docs/DBT.md` and `docs/TESTING.md` guides covering the dbt project and the
   full current test/check inventory.
+- Folder-based pytest organization under `tests/unit/`, `tests/integration/` and
+  `tests/smoke/`, with folder-applied markers and a throwaway Postgres fixture
+  that applies `sql/scripts/01..07`.
+- Smoke coverage for production imports, required environment settings, Postgres
+  reachability and safe Makefile targets, plus `make py-unit`,
+  `make py-integration` and `make py-smoke`.
+- GitHub Actions CI and deploy workflows with SHA-pinned actions, Gitleaks,
+  fixture-backed dbt builds, image smoke tests, GHCR `sha-<commit>` images,
+  digest-based SSH/Compose staging deploys and manually approved production
+  deploys.
+- `.github/CODEOWNERS`, pull request and issue templates; `scripts/load_fixtures.py`
+  and `scripts/deploy.sh`; a `ci` dbt target with prefixed layer schemas.
+- `make db-init-audit` to bootstrap audit/control tables in a CI database without
+  applying the production-named `01_init_schema.sql`.
 
 ### Changed
 
@@ -48,6 +62,10 @@ all current work is listed under `Unreleased`.
 - The Airflow image uses uv `0.5.0`, the Python 3.13 constraints file and a
   full Dockerfile-owned `PYTHONPATH` covering the project venv and Airflow user
   site; `airflow/scripts/*.sh` are marked executable at build time.
+- `airflow/compose.yml` accepts `AIRFLOW_IMAGE` so CI and deployments can pin a
+  digest while local builds retain the `fleet-airflow:local` default.
+- `dbt/models/bronze/sources.yml` no longer hard-codes the warehouse database,
+  allowing the `ci` profile to resolve sources in `fleet_dev`.
 - The root `.dockerignore` excludes local Airflow state, secrets, caches and
   generated artifacts; `airflow/.gitignore` ignores runtime databases, config
   and Python caches.
@@ -72,6 +90,7 @@ all current work is listed under `Unreleased`.
 - `helpers/protect_env.sh` uses anchored path patterns, allows `.env.example`,
   and installs a pre-commit hook pointing at its real location.
 - `helpers/monitor_logs.sh` runs under `set -euo pipefail` with guarded probes.
+- `.githooks/pre-push` uses LF endings so `set -euo pipefail` works in bash.
 - `make airflow-test` runs the orchestration suite from `airflow/tests/` with
   `PYTHONPATH=airflow`.
 - DAG integrity, daily structure, ingestion tier and watchdog test paths now
@@ -82,3 +101,6 @@ all current work is listed under `Unreleased`.
   before writing; task audit rows close on `BaseException`.
 - Earlier Makefile bootstrap and pre-push hook path breakages.
 - Ingestion audit logging and verification were hardened.
+- Fixture loading now adds missing referenced rows so the full dbt fixture build
+  passes its relationship tests, and CI bootstraps audit/control before dbt so
+  the best-effort audit loader can record the invocation.

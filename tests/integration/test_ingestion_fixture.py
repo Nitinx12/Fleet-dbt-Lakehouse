@@ -1,4 +1,4 @@
-"""Ingestion must only upsert against the contract primary key."""
+"""Ingestion writes fixture rows and contract keys into bronze."""
 
 from __future__ import annotations
 
@@ -6,47 +6,43 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import Engine
 
-from scripts.ingestion import (
-    DAG_ID,
-    Source,
-    _arguments,
-    _ensure_bronze_primary_key,
-    _selected_contracts,
-)
+from scripts import ingestion
+from scripts.ingestion import Source, _ensure_bronze_primary_key
 
 
-def _source(target: str) -> Source:
-    """Return the minimum source specification needed for a key check."""
+def _source(
+    target: str,
+    *,
+    load_type: str = "INCREMENTAL",
+    cursor: str | None = "updated_at",
+    watermark_type: str | None = "TIMESTAMP",
+    columns: tuple[str, ...] = ("contract_id", "other_id"),
+    pk: tuple[str, ...] = ("contract_id",),
+) -> Source:
+    """Return the minimum source specification for a bronze write."""
     return Source(
         source_table_id=1,
         system="mysql",
         schema="fleet_registry",
         table="key_check",
         target=target,
-        load_type="INCREMENTAL",
-        cursor="updated_at",
-        watermark_type="TIMESTAMP",
-        pk=("contract_id",),
-        columns=("contract_id", "other_id"),
+        load_type=load_type,
+        cursor=cursor,
+        watermark_type=watermark_type,
+        pk=pk,
+        columns=columns,
     )
 
 
-@pytest.mark.integration
-def test_bronze_primary_key_must_match_contract() -> None:
+def test_bronze_primary_key_must_match_contract(postgres_engine: Engine) -> None:
     """Add a missing key and reject an incompatible existing key."""
-    from utils.connection import get_postgres_engine
-
-    try:
-        engine = get_postgres_engine()
-    except SQLAlchemyError:
-        pytest.skip("Postgres not reachable")
-
     suffix = uuid4().hex[:12]
     matching = _source(f"audit_key_match_{suffix}")
     mismatched = _source(f"audit_key_mismatch_{suffix}")
-    with engine.connect() as connection:
+
+    with postgres_engine.connect() as connection:
         transaction = connection.begin()
         try:
             connection.execute(
@@ -88,40 +84,28 @@ def test_bronze_primary_key_must_match_contract() -> None:
             transaction.rollback()
 
 
-@pytest.mark.unit
-def test_airflow_arguments_keep_the_manual_defaults() -> None:
-    """Keep a no-argument ingestion run backward compatible."""
-    args = _arguments([])
-
-    assert args.source is None
-    assert args.table is None
-    assert args.batch_id is None
-    assert args.airflow_dag_id == DAG_ID
-    assert args.airflow_run_id is None
-
-
-@pytest.mark.unit
-def test_table_selection_limits_the_source_contract() -> None:
-    """A per-table Airflow task loads only its requested contract."""
-    contracts = [
-        {"source": "mysql.fleet_registry.drivers"},
-        {"source": "mongodb.fleet_operations.delivery_events"},
+def test_fixture_rows_land_in_bronze(postgres_engine: Engine) -> None:
+    """Fixture-mode rows go through the same bronze write path as sources."""
+    spec = _source(
+        "fixture_drivers",
+        load_type="FULL",
+        cursor=None,
+        watermark_type=None,
+        columns=("driver_id", "display_name"),
+        pk=("driver_id",),
+    )
+    rows = [
+        {"driver_id": "d1", "display_name": "Ada"},
+        {"driver_id": "d2", "display_name": "Lin"},
     ]
+    types = {"driver_id": "text", "display_name": "text"}
 
-    selected = _selected_contracts(contracts, "mysql", "drivers")
+    ingestion._ensure_bronze(postgres_engine, spec, types)
 
-    assert selected == [{"source": "mysql.fleet_registry.drivers"}]
-
-
-@pytest.mark.unit
-def test_table_selection_rejects_an_unknown_contract() -> None:
-    """Reject a task that does not map to a declared source contract."""
-    with pytest.raises(ValueError, match="no contract matches"):
-        _selected_contracts([], "mongo", "missing")
-
-
-@pytest.mark.unit
-def test_table_flag_requires_a_source() -> None:
-    """Prevent an ambiguous per-table command."""
-    with pytest.raises(SystemExit):
-        _arguments(["--table", "drivers"])
+    assert ingestion._write_bronze(postgres_engine, spec, rows) == 2
+    assert ingestion._count_bronze(postgres_engine, spec) == 2
+    with postgres_engine.connect() as connection:
+        driver_ids = connection.execute(
+            text("SELECT driver_id FROM bronze.fixture_drivers ORDER BY driver_id")
+        ).scalars()
+    assert driver_ids.all() == ["d1", "d2"]

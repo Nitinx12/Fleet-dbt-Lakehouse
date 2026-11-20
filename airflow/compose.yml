@@ -1,6 +1,7 @@
 name: fleet-airflow
 
 x-airflow-common: &airflow-common
+  image: ${AIRFLOW_IMAGE:-fleet-airflow:local}
   build:
     context: ..
     dockerfile: airflow/Dockerfile

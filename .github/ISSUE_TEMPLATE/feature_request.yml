@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a model, contract, orchestration or platform improvement.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve and who is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the intended change and its boundaries.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Contracts, tests, docs, changelog and deployment impact.
+    validations:
+      required: true
+  - type: checkboxes
+    id: approvals
+    attributes:
+      label: Required approvals
+      options:
+        - label: Breaking contract, SLO or dependency changes are called out explicitly.
+          required: true

@@ -47,7 +47,6 @@ MANIFEST: dict[str, Any] = {
 }
 
 
-@pytest.mark.unit
 def test_model_result_becomes_a_run_row() -> None:
     run_rows, dq_rows = dbt_audit.parse_results(
         [MODEL_RESULT],
@@ -74,7 +73,6 @@ def test_model_result_becomes_a_run_row() -> None:
     ]
 
 
-@pytest.mark.unit
 def test_test_result_targets_the_model_it_checks() -> None:
     run_rows, dq_rows = dbt_audit.parse_results(
         [TEST_RESULT],
@@ -101,7 +99,6 @@ def test_test_result_targets_the_model_it_checks() -> None:
     ]
 
 
-@pytest.mark.unit
 def test_unaudited_and_missing_nodes_are_handled() -> None:
     run_rows, dq_rows = dbt_audit.parse_results(
         [
@@ -121,7 +118,6 @@ def test_unaudited_and_missing_nodes_are_handled() -> None:
     assert run_rows[0]["target_schema"] is None
 
 
-@pytest.mark.unit
 def test_unknown_status_is_rejected_before_any_write() -> None:
     run_rows, _ = dbt_audit.parse_results(
         [{**MODEL_RESULT, "status": "partial_success"}],
@@ -134,7 +130,6 @@ def test_unknown_status_is_rejected_before_any_write() -> None:
         log_dbt_results(1, run_rows)
 
 
-@pytest.mark.unit
 def test_invocation_started_at_is_timezone_aware() -> None:
     started = dbt_audit.invocation_started_at(
         {"metadata": {"invocation_started_at": "2026-11-18T05:55:12.639947Z"}}
@@ -145,7 +140,6 @@ def test_invocation_started_at_is_timezone_aware() -> None:
     assert dbt_audit.invocation_started_at({"metadata": {}}) is None
 
 
-@pytest.mark.unit
 def test_invocation_row_maps_every_field() -> None:
     started = datetime(2026, 11, 18, 5, 55, 12, tzinfo=UTC)
     row = dbt_audit._invocation_row(
@@ -167,7 +161,6 @@ def test_invocation_row_maps_every_field() -> None:
     }
 
 
-@pytest.mark.unit
 def test_missing_invocation_id_writes_nothing(tmp_path: Path) -> None:
     _write_artifacts(
         tmp_path,
@@ -185,7 +178,6 @@ def test_missing_invocation_id_writes_nothing(tmp_path: Path) -> None:
     assert written == (0, 0)
 
 
-@pytest.mark.unit
 def test_missing_artifacts_write_nothing(tmp_path: Path) -> None:
     written = dbt_audit.audit_invocation(
         tmp_path,
@@ -196,7 +188,6 @@ def test_missing_artifacts_write_nothing(tmp_path: Path) -> None:
     assert written == (0, 0)
 
 
-@pytest.mark.unit
 def test_stale_artifacts_write_nothing(tmp_path: Path) -> None:
     _write_artifacts(
         tmp_path,
@@ -213,7 +204,6 @@ def test_stale_artifacts_write_nothing(tmp_path: Path) -> None:
     assert written == (0, 0)
 
 
-@pytest.mark.unit
 def test_non_data_commands_write_nothing(tmp_path: Path) -> None:
     _write_artifacts(
         tmp_path,
@@ -230,7 +220,6 @@ def test_non_data_commands_write_nothing(tmp_path: Path) -> None:
     assert written == (0, 0)
 
 
-@pytest.mark.unit
 def test_provided_batch_is_not_finished(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

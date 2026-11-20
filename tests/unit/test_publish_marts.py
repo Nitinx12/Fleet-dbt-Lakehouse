@@ -12,14 +12,12 @@ import pytest
 from scripts import publish_marts
 
 
-@pytest.mark.unit
 def test_publish_list_excludes_the_pii_driver_scorecard() -> None:
     """Keep the driver display-name mart inside Postgres."""
     assert "mart_driver_scorecard_monthly" not in publish_marts.PUBLISHABLE_MARTS
     assert len(publish_marts.PUBLISHABLE_MARTS) == 5
 
 
-@pytest.mark.unit
 @pytest.mark.parametrize(
     ("row", "expected"),
     [
@@ -68,20 +66,17 @@ def test_databricks_type_preserves_mart_contract(
     assert publish_marts._databricks_type(row) == expected
 
 
-@pytest.mark.unit
 def test_identifier_rejects_unsafe_sql_fragments() -> None:
     """Limit generated DDL to known snake_case identifiers."""
     with pytest.raises(publish_marts.PublishError, match="snake_case"):
         publish_marts._identifier("marts; drop schema marts", "schema")
 
 
-@pytest.mark.unit
 def test_http_connection_errors_are_handled() -> None:
     """Close the publisher audit trail when the SQL endpoint is unreachable."""
     assert publish_marts.HTTPError in publish_marts._HANDLED_ERRORS
 
 
-@pytest.mark.unit
 def test_sql_literal_escapes_and_types() -> None:
     """Render safe Databricks literals for every mart value type."""
     assert publish_marts._sql_literal(None) == "NULL"
@@ -97,7 +92,6 @@ def test_sql_literal_escapes_and_types() -> None:
     assert publish_marts._sql_literal(False) != "0"
 
 
-@pytest.mark.unit
 def test_insert_rows_emits_one_multi_row_literal_statement() -> None:
     """Batch inserts must not fall back to per-row executemany round-trips."""
     calls: list[str] = []
@@ -119,7 +113,6 @@ def test_insert_rows_emits_one_multi_row_literal_statement() -> None:
     assert calls[0].count("('k0', 0), ('k1', 1), ('k2', 2)") == 1
 
 
-@pytest.mark.unit
 def test_insert_rows_splits_on_the_sql_char_budget() -> None:
     """Keep each literal statement under PUBLISH_MAX_SQL_CHARS."""
     calls: list[str] = []
@@ -142,7 +135,6 @@ def test_insert_rows_splits_on_the_sql_char_budget() -> None:
     assert sum(statement.count("('key-") for statement in calls) == 10
 
 
-@pytest.mark.unit
 def test_worker_count_only_splits_large_loads() -> None:
     """Small tables stay on one connection; large ones use PUBLISH_WORKERS."""
     original_rows = publish_marts.config.PUBLISH_WORKER_MIN_ROWS
@@ -167,7 +159,6 @@ class _Recorder:
         self.lines.append(message % args if args else str(message))
 
 
-@pytest.mark.unit
 def test_merge_rows_logs_progress_after_every_statement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -204,7 +195,6 @@ def test_merge_rows_logs_progress_after_every_statement(
     assert all(line.startswith("mart_x: merged ") for line in recorder.lines)
 
 
-@pytest.mark.unit
 def test_load_rows_logs_progress_for_single_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -38,6 +38,6 @@ markers = [
     "unit: fast, isolated, no I/O",
     "integration: needs a real service",
     "contract: contract drift checks",
-    "smoke: end-to-end fixture pipeline",
+    "smoke: fast post-build or post-deploy liveness checks",
     "smoke_prod: read-only checks against production",
 ]

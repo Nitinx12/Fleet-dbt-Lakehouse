@@ -2,6 +2,8 @@
 
 import os
 
+import pytest
+
 _REQUIRED = {
     "PG_HOST": "localhost",
     "PG_PORT": "5432",
@@ -22,3 +24,11 @@ _REQUIRED = {
 
 for _name, _value in _REQUIRED.items():
     os.environ.setdefault(_name, _value)
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Apply suite markers from the folder path."""
+    for item in items:
+        for marker in ("unit", "integration", "smoke"):
+            if marker in item.path.parts and item.get_closest_marker(marker) is None:
+                item.add_marker(getattr(pytest.mark, marker))

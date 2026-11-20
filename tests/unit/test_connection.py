@@ -7,7 +7,6 @@ from typing import Any, Self
 import pytest
 
 
-@pytest.mark.unit
 def test_connection_exposes_all_four_getters() -> None:
     from utils import connection
 
@@ -18,7 +17,6 @@ def test_connection_exposes_all_four_getters() -> None:
     assert callable(connection.open_databricks_connection)
 
 
-@pytest.mark.unit
 def test_connection_logger_stays_quiet_on_console() -> None:
     import logging
     from logging.handlers import RotatingFileHandler
@@ -38,7 +36,6 @@ def test_connection_logger_stays_quiet_on_console() -> None:
     assert consoles and consoles[0].level == logging.WARNING
 
 
-@pytest.mark.unit
 def test_databricks_connection_forwards_retry_base_seconds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
