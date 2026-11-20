@@ -144,32 +144,44 @@ def _set_mysql_session_timezone(dbapi_connection: Any, _record: Any) -> None:
         )
 
 
+def open_databricks_connection() -> Connection:
+    """Create a new Databricks SQL connection; the caller owns close()."""
+    log.info(f"Opening Databricks connection to '{config.DATABRICKS_HOST}'")
+
+    connect_kwargs = {
+        "server_hostname": config.DATABRICKS_HOST,
+        "http_path": config.DATABRICKS_HTTP_PATH,
+        "access_token": config.DATABRICKS_TOKEN,
+        "_retry_stop_after_attempts_count": config.DATABRICKS_MAX_ATTEMPTS,
+        "_socket_timeout": config.DATABRICKS_SOCKET_TIMEOUT,
+    }
+    if config.DATABRICKS_RETRY_BASE_SECONDS:
+        # exponential from the base, capped at the documented 60s
+        base = config.DATABRICKS_RETRY_BASE_SECONDS
+        connect_kwargs["_retry_delay_min"] = base
+        connect_kwargs["_retry_delay_max"] = max(base, 60)
+    # unset means the warehouse default, so omit rather than pass None
+    if config.DATABRICKS_CATALOG:
+        connect_kwargs["catalog"] = config.DATABRICKS_CATALOG
+    if config.DATABRICKS_SCHEMA:
+        connect_kwargs["schema"] = config.DATABRICKS_SCHEMA
+
+    try:
+        connection = databricks_sql.connect(**connect_kwargs)
+        # ping now so the error names this call, not a later query
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except DatabricksError:
+        log.exception("Failed to connect to Databricks")
+        raise
+    return connection
+
+
 def get_databricks_connection() -> Connection:
     """Return a cached Databricks SQL connection, creating it on first use."""
     global _databricks_connection
 
     if _databricks_connection is None:
-        log.info(f"Opening Databricks connection to '{config.DATABRICKS_HOST}'")
-
-        connect_kwargs = {
-            "server_hostname": config.DATABRICKS_HOST,
-            "http_path": config.DATABRICKS_HTTP_PATH,
-            "access_token": config.DATABRICKS_TOKEN,
-        }
-        # unset means the warehouse default, so omit rather than pass None
-        if config.DATABRICKS_CATALOG:
-            connect_kwargs["catalog"] = config.DATABRICKS_CATALOG
-        if config.DATABRICKS_SCHEMA:
-            connect_kwargs["schema"] = config.DATABRICKS_SCHEMA
-
-        try:
-            _databricks_connection = databricks_sql.connect(**connect_kwargs)
-            # ping now so the error names this call, not a later query
-            with _databricks_connection.cursor() as cursor:
-                cursor.execute("SELECT 1")
-        except DatabricksError:
-            _databricks_connection = None
-            log.exception("Failed to connect to Databricks")
-            raise
+        _databricks_connection = open_databricks_connection()
 
     return _databricks_connection
