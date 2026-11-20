@@ -102,6 +102,17 @@ def test_required_settings_are_loaded_in_process() -> None:
 
     assert isinstance(engine.PG_PORT, int)
     assert isinstance(engine.MYSQL_PORT, int)
+    assert engine.DATABRICKS_MAX_ATTEMPTS > 0
+    assert engine.DATABRICKS_SOCKET_TIMEOUT > 0
+    assert engine.PUBLISH_FETCH_SIZE > 0
+    assert engine.PUBLISH_MAX_SQL_CHARS > 0
+    assert engine.PUBLISH_WORKERS > 0
+    assert engine.PUBLISH_WORKER_MIN_ROWS > 0
+    assert engine.PUBLISH_MART_WORKERS > 0
+    assert (
+        engine.DATABRICKS_RETRY_BASE_SECONDS is None
+        or engine.DATABRICKS_RETRY_BASE_SECONDS > 0
+    )
     assert engine.MONGO_DB_NAME
     assert engine.MYSQL_DATABASE
     assert (

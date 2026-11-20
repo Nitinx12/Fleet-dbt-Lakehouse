@@ -37,6 +37,38 @@ DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN")
 DATABRICKS_CATALOG = os.getenv("DATABRICKS_CATALOG")
 DATABRICKS_SCHEMA = os.getenv("DATABRICKS_SCHEMA")
 
+
+def _optional_positive_int(name: str) -> int | None:
+    """Read a positive integer environment variable; None when unset."""
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return None
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise OSError(f"{name} must be an integer, got: {value!r}") from exc
+    if parsed <= 0:
+        raise OSError(f"{name} must be greater than zero, got: {value!r}")
+    return parsed
+
+
+def _positive_int(name: str, default: int) -> int:
+    """Read a positive integer environment variable or return its default."""
+    parsed = _optional_positive_int(name)
+    return default if parsed is None else parsed
+
+
+PUBLISH_MAX_PARAMS = _positive_int("PUBLISH_MAX_PARAMS", 10_000)
+PUBLISH_FETCH_SIZE = _positive_int("PUBLISH_FETCH_SIZE", 1_000)
+PUBLISH_MAX_SQL_CHARS = _positive_int("PUBLISH_MAX_SQL_CHARS", 400_000)
+PUBLISH_WORKERS = _positive_int("PUBLISH_WORKERS", 1)
+PUBLISH_WORKER_MIN_ROWS = _positive_int("PUBLISH_WORKER_MIN_ROWS", 50_000)
+PUBLISH_MART_WORKERS = _positive_int("PUBLISH_MART_WORKERS", 3)
+DATABRICKS_MAX_ATTEMPTS = _positive_int("DATABRICKS_MAX_ATTEMPTS", 3)
+DATABRICKS_SOCKET_TIMEOUT = _positive_int("DATABRICKS_SOCKET_TIMEOUT", 30)
+# unset keeps the connector's built-in backoff schedule (1s .. 10s)
+DATABRICKS_RETRY_BASE_SECONDS = _optional_positive_int("DATABRICKS_RETRY_BASE_SECONDS")
+
 # cast now: a driver must not receive a string
 if PG_PORT is not None:
     try:
