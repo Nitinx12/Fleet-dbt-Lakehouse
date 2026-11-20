@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-DAG_FILE = ROOT / "airflow" / "dags" / "fleet_dbt_daliy.py"
+DAG_FILE = ROOT / "dags" / "fleet_dbt_daliy.py"
 
 
 def _tier_tables() -> dict[str, tuple[tuple[str, ...], ...]]:
@@ -28,7 +28,7 @@ def test_every_contract_table_has_one_source_tier() -> None:
     """Require an explicit tier decision whenever a source contract is added."""
     tiers = _tier_tables()
     contract_index = json.loads(
-        (ROOT / "contracts" / "sources_index.json").read_text(encoding="utf-8")
+        (ROOT.parent / "contracts" / "sources_index.json").read_text(encoding="utf-8")
     )
     expected = {
         (

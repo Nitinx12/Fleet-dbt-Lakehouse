@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-DAGS_DIRECTORY = ROOT / "airflow" / "dags"
+DAGS_DIRECTORY = ROOT / "dags"
 
 
 @pytest.mark.unit

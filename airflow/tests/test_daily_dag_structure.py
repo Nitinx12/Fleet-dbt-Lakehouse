@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-DAG_FILE = ROOT / "airflow" / "dags" / "fleet_dbt_daliy.py"
+DAG_FILE = ROOT / "dags" / "fleet_dbt_daliy.py"
 
 
 def _dag():
