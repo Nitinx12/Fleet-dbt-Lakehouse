@@ -106,6 +106,7 @@ def test_required_settings_are_loaded_in_process() -> None:
     assert engine.DATABRICKS_SOCKET_TIMEOUT > 0
     assert engine.PUBLISH_FETCH_SIZE > 0
     assert engine.PUBLISH_MAX_SQL_CHARS > 0
+    assert engine.PUBLISH_MERGE_MAX_SQL_CHARS > 0
     assert engine.PUBLISH_WORKERS > 0
     assert engine.PUBLISH_WORKER_MIN_ROWS > 0
     assert engine.PUBLISH_MART_WORKERS > 0

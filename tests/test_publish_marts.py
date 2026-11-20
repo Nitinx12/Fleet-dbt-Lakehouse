@@ -191,12 +191,12 @@ def test_merge_rows_logs_progress_after_every_statement(
         publish_marts.Column("mart_key", "character varying", "STRING"),
         publish_marts.Column("amount", "numeric", "DECIMAL(18,2)"),
     ]
-    original = publish_marts.config.PUBLISH_MAX_SQL_CHARS
-    publish_marts.config.PUBLISH_MAX_SQL_CHARS = 120
+    original = publish_marts.config.PUBLISH_MERGE_MAX_SQL_CHARS
+    publish_marts.config.PUBLISH_MERGE_MAX_SQL_CHARS = 120
     try:
         sent = publish_marts._merge_rows(None, Cursor(), "mart_x", columns, None, None)
     finally:
-        publish_marts.config.PUBLISH_MAX_SQL_CHARS = original
+        publish_marts.config.PUBLISH_MERGE_MAX_SQL_CHARS = original
 
     assert sent == 6
     assert len(statements) > 1

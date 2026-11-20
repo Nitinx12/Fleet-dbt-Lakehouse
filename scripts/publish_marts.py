@@ -462,27 +462,31 @@ def _sql_literal(value: Any) -> str:
 
 
 def _values_chunks(
-    rows: Iterator[tuple[Any, ...]] | Sequence[tuple[Any, ...]], overhead: int
-) -> Iterator[str]:
-    """Yield `(...), (...)` row lists, each full up to PUBLISH_MAX_SQL_CHARS.
+    rows: Iterator[tuple[Any, ...]] | Sequence[tuple[Any, ...]],
+    overhead: int,
+    max_chars: int | None = None,
+) -> Iterator[tuple[str, int]]:
+    """Yield `((...), (...), row_count)` chunks, each full up to `max_chars`.
 
-    `overhead` is the length of the statement text wrapped around the values.
-    The connector's executemany issues one request per row and bound parameters
-    cap at 10k, so literals keep a large load to a few statements.
+    `max_chars` defaults to PUBLISH_MAX_SQL_CHARS. `overhead` is the length of the
+    statement text wrapped around the values. The connector's executemany issues
+    one request per row and bound parameters cap at 10k, so literals keep a large
+    load to a few statements. The row count lets callers log what was really sent.
     """
-    limit = max(config.PUBLISH_MAX_SQL_CHARS - overhead, 1)
+    cap = config.PUBLISH_MAX_SQL_CHARS if max_chars is None else max_chars
+    limit = max(cap - overhead, 1)
     batch: list[str] = []
     chars = 0
     for row in rows:
         rendered = "(" + ", ".join(map(_sql_literal, row)) + ")"
         if batch and chars + len(rendered) + 2 > limit:
-            yield ", ".join(batch)
+            yield ", ".join(batch), len(batch)
             batch = []
             chars = 0
         batch.append(rendered)
         chars += len(rendered) + 2
     if batch:
-        yield ", ".join(batch)
+        yield ", ".join(batch), len(batch)
 
 
 def _insert_rows(
@@ -493,7 +497,7 @@ def _insert_rows(
         return
     names = ", ".join(_identifier(column.name, "column") for column in columns)
     prefix = f"INSERT INTO {_table_name(table)} ({names}) VALUES "
-    for values in _values_chunks(rows, len(prefix)):
+    for values, _ in _values_chunks(rows, len(prefix)):
         cursor.execute(prefix + values)
 
 
@@ -531,34 +535,42 @@ def _merge_rows(
     watermark: Any | None,
     high: Any | None,
 ) -> int:
-    """MERGE pending rows into the live table, oldest watermark first."""
+    """MERGE pending rows into the live table, oldest watermark first.
+
+    Statements are packed up to PUBLISH_MERGE_MAX_SQL_CHARS: each MERGE has a
+    large fixed cost, so fewer, fuller statements are much faster than many
+    small ones.
+    """
     prefix, suffix = _merge_statement_parts(mart, columns)
     batches = _source_rows(pg, mart, columns, watermark, high, ordered=True)
-    sent = 0
-
-    def rows() -> Iterator[tuple[Any, ...]]:
-        nonlocal sent
-        for batch in batches:
-            sent += len(batch)
-            yield from batch
+    merged = 0
+    rows = (row for batch in batches for row in batch)
 
     try:
         started = time.perf_counter()
-        chunks = enumerate(_values_chunks(rows(), len(prefix) + len(suffix)), start=1)
-        for statements, values in chunks:
+        chunks = _values_chunks(
+            rows,
+            len(prefix) + len(suffix),
+            max_chars=config.PUBLISH_MERGE_MAX_SQL_CHARS,
+        )
+        for statements, (values, count) in enumerate(chunks, start=1):
+            statement_started = time.perf_counter()
             cursor.execute(prefix + values + suffix)
+            merged += count
             # A MERGE can run for minutes; log after each one so a long run
-            # never looks stuck.
+            # never looks stuck. `merged` counts rows actually executed.
             log.info(
-                "%s: merged %s rows in %s statements (%.1fs)",
+                "%s: merged %s rows in %s statements (%.1fs; last: %s rows, %.1fs)",
                 mart,
-                sent,
+                merged,
                 statements,
                 time.perf_counter() - started,
+                count,
+                time.perf_counter() - statement_started,
             )
     finally:
         batches.close()
-    return sent
+    return merged
 
 
 def _worker_count(rows_to_load: int) -> int:

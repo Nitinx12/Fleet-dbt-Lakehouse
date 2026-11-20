@@ -61,6 +61,11 @@ def _positive_int(name: str, default: int) -> int:
 PUBLISH_MAX_PARAMS = _positive_int("PUBLISH_MAX_PARAMS", 10_000)
 PUBLISH_FETCH_SIZE = _positive_int("PUBLISH_FETCH_SIZE", 1_000)
 PUBLISH_MAX_SQL_CHARS = _positive_int("PUBLISH_MAX_SQL_CHARS", 400_000)
+# MERGE pays a fixed cost per statement, so it is packed far fuller than INSERT;
+# 4M chars stays under Databricks' 16 MiB limit even at 4 bytes per character.
+PUBLISH_MERGE_MAX_SQL_CHARS = _positive_int(
+    "PUBLISH_MERGE_MAX_SQL_CHARS", max(4_000_000, PUBLISH_MAX_SQL_CHARS)
+)
 PUBLISH_WORKERS = _positive_int("PUBLISH_WORKERS", 1)
 PUBLISH_WORKER_MIN_ROWS = _positive_int("PUBLISH_WORKER_MIN_ROWS", 50_000)
 PUBLISH_MART_WORKERS = _positive_int("PUBLISH_MART_WORKERS", 3)
