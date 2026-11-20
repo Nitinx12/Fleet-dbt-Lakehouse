@@ -37,6 +37,42 @@ DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN")
 DATABRICKS_CATALOG = os.getenv("DATABRICKS_CATALOG")
 DATABRICKS_SCHEMA = os.getenv("DATABRICKS_SCHEMA")
 
+# Airflow-only settings remain optional to command-line pipeline scripts.
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = os.getenv("SMTP_PORT")
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_STARTTLS = os.getenv("SMTP_STARTTLS")
+ALERT_EMAIL_FROM = os.getenv("ALERT_EMAIL_FROM")
+ALERT_EMAIL_TO = os.getenv("ALERT_EMAIL_TO")
+ALERT_WEBHOOK_URL = os.getenv("ALERT_WEBHOOK_URL")
+DBT_TARGET = os.getenv("DBT_TARGET", "dev")
+MYSQL_POOL_SLOTS = os.getenv("MYSQL_POOL_SLOTS", "4")
+MONGO_POOL_SLOTS = os.getenv("MONGO_POOL_SLOTS", "3")
+AIRFLOW_DB_PASSWORD = os.getenv("AIRFLOW_DB_PASSWORD")
+AIRFLOW_REQUIRED_ENV = (
+    "PG_HOST",
+    "PG_PORT",
+    "PG_DBNAME",
+    "PG_USER",
+    "PG_PASSWORD",
+    "MONGO_URI",
+    "MONGO_DB_NAME",
+    "MYSQL_HOST",
+    "MYSQL_PORT",
+    "MYSQL_USER",
+    "MYSQL_PASSWORD",
+    "MYSQL_DATABASE",
+    "DATABRICKS_HOST",
+    "DATABRICKS_HTTP_PATH",
+    "DATABRICKS_TOKEN",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "ALERT_EMAIL_FROM",
+    "ALERT_EMAIL_TO",
+    "DBT_TARGET",
+)
+
 
 def _optional_positive_int(name: str) -> int | None:
     """Read a positive integer environment variable; None when unset."""
