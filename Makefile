@@ -14,7 +14,6 @@ MAKEFLAGS += --warn-undefined-variables --no-builtin-rules
 
 # Configuration
 UV ?= uv
-UV_CACHE_DIR ?= out/uv-cache
 PSQL ?= psql
 ENV ?= dev
 SELECT ?=
@@ -27,8 +26,6 @@ VENV_MARKER ?= .venv/pyvenv.cfg
 VENV_STAMP ?= .venv/.installed
 
 -include .env
-
-export UV_CACHE_DIR
 
 DBT_SELECT = $(if $(strip $(SELECT)),--select "$(SELECT)",)
 DBT = "$(UV)" run --no-sync python scripts/run_dbt.py
@@ -144,7 +141,7 @@ env-check: check-version ## Verify application-required environment variables.
 	$(Q)"$(UV)" run --no-sync python -c "import utils.engine; print('env OK: all required variables set')"
 
 ## Database and ingestion
-.PHONY: db-init ingest
+.PHONY: db-init ingest publish-marts
 db-init: check-tools ## Create the warehouse database and apply SQL bootstrap scripts.
 	$(Q)$(call require_cmd,$(PSQL),Install the PostgreSQL client and put psql on PATH.)
 	$(Q)$(call confirm_destructive)
@@ -162,6 +159,12 @@ ingest: check-version ## Load MySQL and MongoDB sources into the bronze layer.
 	$(Q)$(call confirm_production)
 	$(Q)printf '%s\n' "==> Ingesting sources into ENV=$(ENV)"
 	$(Q)"$(UV)" run --no-sync python scripts/ingestion.py
+
+publish-marts: check-version ## Incrementally publish approved Postgres marts to Databricks.
+	$(Q)$(call require_environment)
+	$(Q)$(call confirm_production)
+	$(Q)printf '%s\n' "==> Publishing Postgres marts to Databricks for ENV=$(ENV)"
+	$(Q)"$(UV)" run --no-sync python scripts/publish_marts.py
 
 ## dbt
 .PHONY: dbt-debug dbt-deps dbt-parse dbt-compile dbt-seed dbt-silver dbt-silver-tests dbt-gold dbt-gold-tests dbt-marts dbt-marts-tests dbt-snapshots dbt-build dbt-test dbt-run dbt-docs dbt-full-refresh build
