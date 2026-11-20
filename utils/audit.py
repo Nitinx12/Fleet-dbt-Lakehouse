@@ -182,14 +182,18 @@ def task_run(
 
     try:
         yield handle
-    except Exception as error:
-        log.error("audit task %s failed (%s)", task_id, type(error).__name__)
-        finish_task(
-            task_log_id,
-            "FAILED",
-            error_message=error_summary(error, "task"),
-            target=target,
-        )
+    except BaseException as error:
+        if isinstance(error, Exception):
+            log.error("audit task %s failed (%s)", task_id, type(error).__name__)
+        try:
+            finish_task(
+                task_log_id,
+                "FAILED",
+                error_message=error_summary(error, "task"),
+                target=target,
+            )
+        except Exception:
+            log.exception("could not close audit task %s", task_log_id)
         raise
     else:
         finish_task(
