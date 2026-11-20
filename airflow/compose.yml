@@ -1,0 +1,124 @@
+name: fleet-airflow
+
+x-airflow-common: &airflow-common
+  build:
+    context: ..
+    dockerfile: airflow/Dockerfile
+    args:
+      AIRFLOW_VERSION: ${AIRFLOW_VERSION:-3.3.2}
+      GIT_SHA: ${GIT_SHA:-unknown}
+  env_file:
+    - ../.env
+  environment: &airflow-env
+    AIRFLOW_HOME: /opt/airflow
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?Set AIRFLOW_DB_PASSWORD in .env}@airflow-metadata/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:${AIRFLOW_DB_PASSWORD:?Set AIRFLOW_DB_PASSWORD in .env}@airflow-metadata/airflow
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__API__BASE_URL: ${AIRFLOW_BASE_URL:?Set AIRFLOW_BASE_URL in .env}
+    PYTHONPATH: /opt/fleet:/opt/fleet/airflow
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    airflow-metadata:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  networks:
+    - airflow
+
+services:
+  airflow-metadata:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:?Set AIRFLOW_DB_PASSWORD in .env}
+    volumes:
+      - airflow-metadata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - airflow
+
+  redis:
+    image: redis:7.4-alpine
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - airflow
+
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      airflow-metadata:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command: "exec /opt/fleet/airflow/scripts/init.sh"
+    restart: "no"
+
+  airflow-api-server:
+    <<: *airflow-common
+    command: api-server
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "${AIRFLOW_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/api/v2/monitor/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$$HOSTNAME\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/fleet/airflow/scripts/healthcheck_worker.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  airflow-metadata:
+
+networks:
+  airflow:

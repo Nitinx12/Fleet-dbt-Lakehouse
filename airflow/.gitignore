@@ -1,0 +1,16 @@
+# Airflow runtime artifacts
+logs/
+airflow.cfg
+unittests.cfg
+airflow.db
+airflow.db.*
+unittests.db
+*.pid
+standalone_admin_password.txt
+webserver_config.py
+
+# Python and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

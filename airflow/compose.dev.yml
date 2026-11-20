@@ -1,0 +1,16 @@
+services:
+  airflow-api-server:
+    volumes:
+      - ../:/opt/fleet
+  airflow-scheduler:
+    volumes:
+      - ../:/opt/fleet
+  airflow-dag-processor:
+    volumes:
+      - ../:/opt/fleet
+  airflow-worker:
+    volumes:
+      - ../:/opt/fleet
+  airflow-init:
+    volumes:
+      - ../:/opt/fleet

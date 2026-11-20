@@ -37,6 +37,26 @@ def test_help_documents_verify_target() -> None:
 
 
 @pytest.mark.unit
+def test_help_documents_airflow_targets() -> None:
+    """Expose the supported local Airflow commands in help."""
+    help_output = _make("help")
+
+    assert "airflow-test" in help_output
+    assert "airflow-up" in help_output
+
+
+@pytest.mark.unit
+def test_contracts_check_is_a_documented_read_only_target() -> None:
+    """Keep the preflight contract check available through Make."""
+    help_output = _make("help")
+    dry_run = _make("--dry-run", "contracts-check")
+
+    assert "contracts-check" in help_output
+    assert "scripts.ingestion import read_contract" in dry_run
+    assert "psql" not in dry_run
+
+
+@pytest.mark.unit
 def test_verify_dry_run_contains_only_quality_checks() -> None:
     """Keep verification independent of database and dbt write targets."""
     dry_run = _make("--dry-run", "verify")

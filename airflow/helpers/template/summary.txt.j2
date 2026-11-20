@@ -1,0 +1,7 @@
+Fleet daily load succeeded
+Run: {{ batch.airflow_run_id | default('unknown') }}
+Batch: {{ batch_id }}
+{% for item in ingestion %}{{ item.task_id }}: {{ item.rows_processed | default(0) }} rows
+{% endfor %}{% for item in reconciliations %}{{ item.target_object }}: {{ item.source_row_count }} / {{ item.target_row_count }} ({{ item.status }})
+{% endfor %}{% if airflow_url %}Airflow: {{ airflow_url }}
+{% endif %}

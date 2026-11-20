@@ -1,0 +1,14 @@
+<html>
+
+<body style="font-family:Arial,sans-serif">
+    <h2>Fleet daily load succeeded</h2>
+    <p>Run: {{ batch.airflow_run_id | default('unknown') }}<br>Batch: {{ batch_id }}</p>
+    <ul>{% for item in ingestion %}<li>{{ item.task_id }}: {{ item.rows_processed | default(0) }} rows</li>{% endfor %}
+    </ul>
+    <h3>Publication reconciliation</h3>
+    <ul>{% for item in reconciliations %}<li>{{ item.target_object }}: {{ item.source_row_count }} / {{
+            item.target_row_count }} ({{ item.status }})</li>{% endfor %}</ul>{% if airflow_url %}<p><a
+            href="{{ airflow_url }}">Open Airflow run</a></p>{% endif %}
+</body>
+
+</html>

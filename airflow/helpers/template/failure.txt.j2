@@ -1,0 +1,8 @@
+Fleet daily load failed
+Batch: {{ batch_id }}
+Task: {{ task_id }}
+Errors:
+{% for item in errors %}- {{ item }}
+{% endfor %}Next step: clear the failed task to resume under the same run.
+{% if airflow_url %}Airflow: {{ airflow_url }}
+{% endif %}

@@ -1,19 +1,37 @@
+# VCS and CI
 .git
 .github
+
+# Python environments and caches
 .venv
+venv
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Secrets and local config
 .env
 .env.*
 !.env.example
-**/__pycache__
+
+# Generated pipeline and dbt artifacts
 **/target
 **/dbt_packages
 **/logs
-.pytest_cache
-.ruff_cache
+**/*.log
 out
 prod-state
+
+# Local Airflow state
+airflow/*.db
+airflow/*.db.*
+airflow/*.cfg
+airflow/*.pid
+airflow/standalone_admin_password.txt
+airflow/webserver_config.py
+
+# Documentation not needed in the image
 docs
-# Root-level markdown only. Docs blocks under dbt/ are .md files and must stay.
 *.md
-# pyproject uses ARCHITECTURE.md as readme; hatchling fails without it.
-!ARCHITECTURE.md

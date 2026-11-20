@@ -1,0 +1,12 @@
+<html>
+
+<body style="font-family:Arial,sans-serif">
+    <h2>Fleet daily load failed</h2>
+    <p>Batch: {{ batch_id }}<br>Task: {{ task_id }}</p>
+    <h3>Errors</h3>
+    <ul>{% for item in errors %}<li>{{ item }}</li>{% endfor %}</ul>
+    <p>Next step: clear the failed task to resume under the same run.</p>{% if airflow_url %}<p><a
+            href="{{ airflow_url }}">Open Airflow run</a></p>{% endif %}
+</body>
+
+</html>
