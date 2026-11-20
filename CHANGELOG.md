@@ -59,6 +59,14 @@ all current work is listed under `Unreleased`.
 
 ### Fixed
 
+- Helper scripts now read the project's env names (`PG_DBNAME`, `PG_PASSWORD`,
+  `MYSQL_DATABASE`), find `.exe` clients on Windows/WSL and probe with native
+  clients before falling back to port checks.
+- Renamed `helpers/check_heakth.sh` to `helpers/check_health.sh`; dry-run backups
+  no longer require dump tools to be installed.
+- `helpers/protect_env.sh` uses anchored path patterns, allows `.env.example`,
+  and installs a pre-commit hook pointing at its real location.
+- `helpers/monitor_logs.sh` runs under `set -euo pipefail` with guarded probes.
 - `make airflow-test` runs the orchestration suite from `airflow/tests/` with
   `PYTHONPATH=airflow`.
 - DAG integrity, daily structure, ingestion tier and watchdog test paths now
