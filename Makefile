@@ -1,5 +1,5 @@
 # Fleet dbt Warehouse build entry point. Run `make help`; add targets as `name: ## summary`.
-# Configuration: ENV=dev|prod SELECT=<dbt selector> CONFIRM=yes V=1.
+# Configuration: ENV=dev|ci|prod SELECT=<dbt selector> EXCLUDE=<resource type> CONFIRM=yes V=1.
 
 .DEFAULT_GOAL := help
 .SUFFIXES:
@@ -17,6 +17,7 @@ UV ?= uv
 PSQL ?= psql
 ENV ?= dev
 SELECT ?=
+EXCLUDE ?=
 CONFIRM ?=
 V ?= 0
 DB_USER ?= postgres
@@ -28,6 +29,7 @@ VENV_STAMP ?= .venv/.installed
 -include .env
 
 DBT_SELECT = $(if $(strip $(SELECT)),--select "$(SELECT)",)
+DBT_EXCLUDE = $(if $(strip $(EXCLUDE)),--exclude-resource-type "$(EXCLUDE)",)
 DBT = "$(UV)" run --no-sync python scripts/run_dbt.py
 
 ifeq ($(V),1)
@@ -45,7 +47,7 @@ test -f "$(VENV_MARKER)" || { printf '%s\n' "make: *** virtual environment not f
 endef
 
 define require_environment
-case "$(ENV)" in dev|prod) ;; *) printf '%s\n' "make: *** ENV must be dev or prod, got '$(ENV)'." >&2; exit 1 ;; esac
+case "$(ENV)" in dev|ci|prod) ;; *) printf '%s\n' "make: *** ENV must be dev, ci or prod, got '$(ENV)'." >&2; exit 1 ;; esac
 endef
 
 define confirm_production
@@ -74,7 +76,7 @@ help: ## Show this help and available configuration.
 			for (i = 1; i <= count; i++) for (j = i + 1; j <= count; j++) if (targets[ordered[j]] < targets[ordered[i]]) { temp = ordered[i]; ordered[i] = ordered[j]; ordered[j] = temp; } \
 			if (count) { printf "\\n%s:\\n", name; for (i = 1; i <= count; i++) { key = ordered[i]; printf "  %-20s %s\\n", targets[key], descriptions[key]; } } \
 		} \
-		END { while ((group = next_group()) != "") { printed_group[group] = 1; print_group(group); } printf "\\nConfiguration: ENV=dev|prod (default dev), SELECT=<dbt selector>, CONFIRM=yes, V=1\\n"; }' "$(firstword $(MAKEFILE_LIST))"
+		END { while ((group = next_group()) != "") { printed_group[group] = 1; print_group(group); } printf "\\nConfiguration: ENV=dev|ci|prod (default dev), SELECT=<dbt selector>, EXCLUDE=<resource type>, CONFIRM=yes, V=1\\n"; }' "$(firstword $(MAKEFILE_LIST))"
 
 ## Setup
 .PHONY: check-tools install setup
@@ -103,7 +105,7 @@ check-version: check-tools check-venv
 	$(Q)actual="$$("$(UV)" run --no-sync python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')"; expected="$$(tr -d '\r\n' < "$(PYTHON_VERSION_FILE)")"; if [ "$$actual" != "$$expected" ]; then printf '%s\n' "warning: Python $$actual is installed; $(PYTHON_VERSION_FILE) pins $$expected." >&2; fi
 
 ## Quality
-.PHONY: lint-fast lint fmt format py-test test check ci verify
+.PHONY: lint-fast lint fmt format py-test py-unit py-integration py-smoke test check ci verify
 lint-fast: check-version ## Run Ruff lint and formatting checks.
 	$(Q)printf '%s\n' "==> Running Ruff checks"
 	$(Q)"$(UV)" run --no-sync ruff check .
@@ -121,6 +123,15 @@ format: fmt ## Alias for fmt.
 py-test: check-version ## Run the Python test suite.
 	$(Q)printf '%s\n' "==> Running Python tests"
 	$(Q)"$(UV)" run --no-sync pytest
+
+py-unit: check-version ## Run fast isolated unit tests.
+	$(Q)"$(UV)" run --no-sync pytest tests/unit
+
+py-integration: check-version ## Run tests against a throwaway Postgres database.
+	$(Q)"$(UV)" run --no-sync pytest tests/integration
+
+py-smoke: check-version ## Run post-build liveness checks.
+	$(Q)"$(UV)" run --no-sync pytest tests/smoke
 
 test: py-test ## Alias for py-test.
 
@@ -163,7 +174,7 @@ env-check: check-version ## Verify application-required environment variables.
 	$(Q)"$(UV)" run --no-sync python -c "import utils.engine; print('env OK: all required variables set')"
 
 ## Database and ingestion
-.PHONY: db-init ingest publish-marts
+.PHONY: db-init db-init-audit ingest load-fixtures publish-marts
 db-init: check-tools ## Create the warehouse database and apply SQL bootstrap scripts.
 	$(Q)$(call require_cmd,$(PSQL),Install the PostgreSQL client and put psql on PATH.)
 	$(Q)$(call confirm_destructive)
@@ -177,11 +188,24 @@ db-init: check-tools ## Create the warehouse database and apply SQL bootstrap sc
 	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/06_audit_relationships.sql"
 	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/07_pipeline_event_triggers.sql"
 
+db-init-audit: check-tools ## Apply audit/control bootstrap scripts to DB_NAME for CI.
+	$(Q)$(call require_cmd,$(PSQL),Install the PostgreSQL client and put psql on PATH.)
+	$(Q)$(call confirm_destructive)
+	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS audit; CREATE SCHEMA IF NOT EXISTS control;"
+	$(Q)for script in 02_audit_tables.sql 03_control_pipeline_registry.sql 04_control_batch_tracking.sql 05_control_watermarks.sql 06_audit_relationships.sql 07_pipeline_event_triggers.sql; do "$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/$$script"; done
+	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -c "INSERT INTO control.pipeline (pipeline_name, airflow_dag_id, description, schedule_cron, owner) VALUES ('fleet_daily', 'fleet_daily_load', 'Daily fleet telemetry and operations load', '0 2 * * *', 'data-engineering') ON CONFLICT (pipeline_name) DO NOTHING"
+
 ingest: check-version ## Load MySQL and MongoDB sources into the bronze layer.
 	$(Q)$(call require_environment)
 	$(Q)$(call confirm_production)
 	$(Q)printf '%s\n' "==> Ingesting sources into ENV=$(ENV)"
 	$(Q)"$(UV)" run --no-sync python scripts/ingestion.py
+
+load-fixtures: check-version ## Load contract samples into bronze; requires FIXTURE_LOAD=1.
+	$(Q)$(call require_environment)
+	$(Q)$(call confirm_production)
+	$(Q)printf '%s\n' "==> Loading contract fixtures into ENV=$(ENV)"
+	$(Q)"$(UV)" run --no-sync python scripts/load_fixtures.py
 
 publish-marts: check-version ## Incrementally publish approved Postgres marts to Databricks.
 	$(Q)$(call require_environment)
@@ -251,7 +275,7 @@ dbt-snapshots: check-version ## Run dbt snapshots in ENV.
 dbt-build: check-version ## Build dbt resources in ENV; optionally set SELECT.
 	$(Q)$(call require_environment)
 	$(Q)$(call confirm_production)
-	$(Q)$(DBT) build --target "$(ENV)" $(DBT_SELECT)
+	$(Q)$(DBT) build --target "$(ENV)" $(DBT_SELECT) $(DBT_EXCLUDE)
 
 build: dbt-build ## Alias for dbt-build.
 
@@ -278,6 +302,15 @@ dbt-full-refresh: ## Rebuild selected dbt resources; requires CONFIRM=yes.
 	$(Q)$(call require_venv)
 	$(Q)printf '%s\n' "==> Full-refreshing dbt resources in ENV=$(ENV)"
 	$(Q)$(DBT) build --target "$(ENV)" --full-refresh $(DBT_SELECT)
+
+## Deployment
+.PHONY: deploy deploy-smoke
+deploy: check-tools ## Deploy IMAGE_REF by digest; requires CONFIRM=yes.
+	$(Q)$(call confirm_destructive)
+	$(Q)bash scripts/deploy.sh deploy
+
+deploy-smoke: check-tools ## Run read-only post-deploy smoke checks.
+	$(Q)bash scripts/deploy.sh smoke
 
 ## Clean
 .PHONY: clean distclean

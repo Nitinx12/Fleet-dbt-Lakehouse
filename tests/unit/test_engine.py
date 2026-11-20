@@ -7,9 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
-_ROOT = Path(__file__).resolve().parents[1]
+_ROOT = Path(__file__).resolve().parents[2]
 
 # Every required setting, so a child process always gets a loadable config.
 _DEFAULTS = {
@@ -59,7 +57,6 @@ _PG_BLANK = {
 }
 
 
-@pytest.mark.unit
 def test_pg_names_from_the_env_file_are_accepted() -> None:
     result = _import_engine(
         {
@@ -75,28 +72,24 @@ def test_pg_names_from_the_env_file_are_accepted() -> None:
     assert result.stdout.strip() == "pg-host 6543 warehouse"
 
 
-@pytest.mark.unit
 def test_databricks_is_required_not_optional() -> None:
     result = _import_engine({"DATABRICKS_TOKEN": ""})
     assert result.returncode != 0, "engine imported without DATABRICKS_TOKEN"
     assert "DATABRICKS_TOKEN" in result.stderr
 
 
-@pytest.mark.unit
 def test_mysql_is_required_not_optional() -> None:
     result = _import_engine({"MYSQL_HOST": ""})
     assert result.returncode != 0, "engine imported without MYSQL_HOST"
     assert "MYSQL_HOST" in result.stderr
 
 
-@pytest.mark.unit
 def test_ports_are_cast_to_int() -> None:
     result = _import_engine({})
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "localhost 5432 fleet_warehouse"
 
 
-@pytest.mark.unit
 def test_required_settings_are_loaded_in_process() -> None:
     from utils import engine
 

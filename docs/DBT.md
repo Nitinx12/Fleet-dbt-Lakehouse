@@ -10,7 +10,7 @@ publish job.
 | Path | Purpose |
 |---|---|
 | `dbt/dbt_project.yml` | Project name, layer schemas, default materialisations and shared vars. |
-| `dbt/profiles.yml` | Postgres targets `dev` and `prod`; `dev` uses `DBT_DEV_SCHEMA`. |
+| `dbt/profiles.yml` | Postgres targets `dev`, `ci` and `prod`; `dev` uses `DBT_DEV_SCHEMA`, `ci` uses `DBT_SCHEMA_PREFIX`. |
 | `dbt/packages.yml` | `dbt_utils` dependency; lockfile is `dbt/package-lock.yml`. |
 | `dbt/models/bronze/sources.yml` | The only dbt source: `bronze` with 12 landed tables. |
 | `dbt/models/silver/` | 12 staging models and `schema.yml`. |
@@ -67,7 +67,7 @@ logical foreign keys carry `relationships` tests.
 | `cleaning.sql` | `clean_string`, `clean_date`, `clean_timestamp` | Normalise blank strings and empty text dates. |
 | `clean_boolean.sql` | `clean_boolean` | Normalise common true/false string spellings. |
 | `bronze_incremental_filter.sql` | `bronze_incremental_filter` | Apply the silver lookback window on `_ingested_at`. |
-| `generate_schema.sql` | `generate_schema_name` | Use the configured schema verbatim instead of dbt's default prefix. |
+| `generate_schema.sql` | `generate_schema_name` | Use the configured schema verbatim; `ci` prefixes custom layer schemas with `DBT_SCHEMA_PREFIX`. |
 | `gold_helpers.sql` | `gold_unknown_key`, `gold_key`, `gold_date_key`, `gold_hash_pii`, `gold_mask_tail`, `gold_watermark` | Surrogate keys, Unknown members, PII handling and fact watermarks. |
 | `marts_helpers.sql` | `mart_watermark`, `mart_key`, `mart_hash`, `mart_ratio`, `mart_month_key` | Incremental marts, dimension-fingerprint checks and safe division. |
 
@@ -86,10 +86,10 @@ defined but unused.
 - `gold_date_start: '2015-01-01'` and `gold_date_end: '2035-12-31'` for
   `dim_date`.
 
-`profiles.yml` has only `dev` and `prod`. `dev` writes to
-`${DBT_DEV_SCHEMA:-dbt_dev}`; `prod` writes to `silver`. There is no `ci`
-target even though some orchestration code references one. Never run `prod`
-without explicit approval, and use `ENV=dev` for local work.
+`profiles.yml` has `dev`, `ci` and `prod`. `dev` writes to
+`${DBT_DEV_SCHEMA:-dbt_dev}`; `ci` writes to the `${DBT_SCHEMA_PREFIX:-ci_}`
+prefix in `fleet_dev`; `prod` writes to `silver`. Never run `prod` without
+explicit approval, and use `ENV=dev` for local work.
 
 ## Common commands
 
@@ -109,7 +109,17 @@ make dbt-marts-tests ENV=dev
 make dbt-test ENV=dev
 make dbt-build ENV=dev
 make dbt-docs ENV=dev
+
+make dbt-parse ENV=ci
+make load-fixtures ENV=ci
+make dbt-build ENV=ci EXCLUDE=unit_test
 ```
+
+`load-fixtures` requires `FIXTURE_LOAD=1` and refuses any `PG_DBNAME` outside
+`fleet_dev` or `fleet_it_*`; CI sets both guards. When `.env` points at another
+database, pass `make PG_DBNAME=fleet_dev load-fixtures ENV=ci` locally. The `ci`
+target prefixes every custom layer schema so CI never writes to production layer
+schemas.
 
 `dbt-full-refresh` and backfills require `CONFIRM=yes` and explicit approval.
 Production commands additionally require `ENV=prod CONFIRM=yes`.

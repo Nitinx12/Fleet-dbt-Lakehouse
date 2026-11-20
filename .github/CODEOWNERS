@@ -1,0 +1,22 @@
+* @Nitinx12
+
+# Pipeline code and SQL need a second pair of eyes.
+/scripts/ @Nitinx12
+/sql/ @Nitinx12
+/contracts/ @Nitinx12
+/dbt/ @Nitinx12
+
+# Orchestration and alerting.
+/airflow/ @Nitinx12
+
+# Quality gates and the CI/CD wiring itself.
+/tests/ @Nitinx12
+/.github/ @Nitinx12
+/.githooks/ @Nitinx12
+/Makefile @Nitinx12
+
+# Governance docs.
+/AGENTS.md @Nitinx12
+/SECURITY.md @Nitinx12
+/CONTRIBUTING.md @Nitinx12
+/docs/ @Nitinx12

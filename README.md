@@ -186,17 +186,11 @@ flowchart LR
 │   ├── FINDING.md
 │   └── TESTING.md
 │
-├── tests/                     # root pytest suite
+├── tests/                     # root pytest suite, markers follow the folder
 │   ├── conftest.py
-│   ├── test_audit.py
-│   ├── test_connection.py
-│   ├── test_dbt_audit.py
-│   ├── test_engine.py
-│   ├── test_ingestion.py
-│   ├── test_makefile.py
-│   ├── test_pipeline_triggers.py
-│   ├── test_publish_marts.py
-│   └── test_run_notebooks.py
+│   ├── unit/                  #   no network, no DB, no Docker
+│   ├── integration/           #   throwaway Postgres built from sql/scripts/01..07
+│   └── smoke/                 #   post-build and post-deploy liveness
 │
 ├── helpers/                   # shell utilities
 │   ├── check_health.sh
@@ -267,20 +261,25 @@ notifications and troubleshooting are in `airflow/README.md`.
 ```bash
 make lint-fast
 make py-test
+make py-unit
+make py-integration
+make py-smoke
 make contracts-check
 make airflow-test
 make dbt-parse ENV=dev
 ```
 
-`make verify` runs lint and Python tests; `make ci` currently aliases `verify`.
+`make verify` runs lint and Python tests; `make ci` still aliases `verify`.
+GitHub Actions adds the full PR/push pipeline, fixture-backed dbt build, image
+build and smoke check, staging deploy and manually approved production deploy.
 See `docs/TESTING.md` for the full inventory, current test counts, helper
-checks, git hooks and known gaps. See `docs/DBT.md` for dbt sources, layers,
-macros, variables and dbt commands.
+checks, git hooks, workflow secrets and known gaps. See `docs/DBT.md` for dbt
+sources, layers, macros, variables and dbt commands.
 
-Current implementation notes: dbt profiles are `dev` and `prod` only;
+Current implementation notes: dbt profiles are `dev`, `ci` and `prod`;
 `contracts-check` validates contract/source name alignment but not column-level
-drift; dbt model contracts are not enforced yet; no dbt unit tests, snapshots or
-GitHub Actions workflows are tracked in this checkout.
+drift; dbt model contracts are not enforced yet; no dbt unit tests or snapshots
+are committed yet.
 
 ## Documentation
 

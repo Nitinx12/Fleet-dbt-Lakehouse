@@ -4,26 +4,17 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import Engine
 
 
-@pytest.mark.integration
-def test_failure_triggers_log_each_failed_state_once() -> None:
-    from utils.connection import get_postgres_engine
-
-    try:
-        engine = get_postgres_engine()
-    except SQLAlchemyError:
-        pytest.skip("Postgres not reachable")
-
+def test_failure_triggers_log_each_failed_state_once(postgres_engine: Engine) -> None:
     suffix = uuid4().hex[:10]
     pipeline_name = f"trg_{suffix}"
     dag_id = f"dag_trg_{suffix}"
     run_id = f"run_{suffix}"
 
-    with engine.connect() as connection:
+    with postgres_engine.connect() as connection:
         transaction = connection.begin()
         try:
             connection.execute(

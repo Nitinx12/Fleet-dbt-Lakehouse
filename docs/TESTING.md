@@ -9,36 +9,60 @@ without explicit approval.
 
 ```bash
 make lint-fast                 # Ruff lint + format check
-make py-test                   # root pytest suite
+make py-test                   # full root pytest suite
+make py-unit                   # fast isolated unit tests
+make py-integration            # throwaway Postgres integration tests
+make py-smoke                  # post-build liveness checks
 make contracts-check           # contract index / source name alignment
+make PG_DBNAME=fleet_dev DB_NAME=fleet_dev CONFIRM=yes db-init-audit  # bootstrap audit/control
+make PG_DBNAME=fleet_dev load-fixtures ENV=ci  # land sample rows in bronze
 make verify                    # lint-fast + py-test
 make airflow-test              # orchestration tests with PYTHONPATH=airflow
 make dbt-parse ENV=dev         # static dbt parse, no warehouse queries
 make dbt-test ENV=dev          # DB-backed dbt tests
 ```
 
-`make ci` currently aliases `verify`; it is not a full CI pipeline. There is no
-tracked `.github/workflows` directory in this checkout, so the CI jobs described
-in `AGENTS.md` and `README.md` are not implemented yet.
+`make ci` still aliases `verify` for local use. The full pipeline lives in
+`.github/workflows/ci.yml` and `.github/workflows/deploy.yml`; see “GitHub
+Actions” below.
 
 ## Python suite — `tests/`
 
-`make py-test` runs pytest from the repo root. Current collection is 51 tests:
-47 `unit` and 4 `integration`. Markers are declared in `pyproject.toml`;
-integration tests skip when their service is unavailable.
+`make py-test` runs pytest from the repo root. Current collection is 73 tests:
+52 `unit`, 5 `integration` and 16 `smoke`. Markers are declared in
+`pyproject.toml` and applied automatically from the folder by `tests/conftest.py`.
+
+```text
+tests/
+├── conftest.py            shared env defaults and folder markers
+├── unit/                  no network, no DB, no Docker
+├── integration/           real Postgres in a throwaway database
+└── smoke/                 fast post-build or post-deploy liveness checks
+```
+
+`tests/integration/conftest.py` creates a uniquely named scratch database,
+applies `sql/scripts/01..07` in order, yields a SQLAlchemy engine, then drops the
+database with `WITH (FORCE)`. Integration tests skip when Postgres is unreachable.
 
 | File | Coverage |
 |---|---|
-| `conftest.py` | Default env vars so modules import without a real `.env`. |
-| `test_audit.py` | Audit labels, required columns, `TaskHandle`, sanitised errors and a rolled-back Postgres audit round trip. |
-| `test_connection.py` | Connection getters, quiet logger and Databricks retry configuration. |
-| `test_dbt_audit.py` | dbt artifact parsing, invocation rows, stale/missing artifacts and batch linkage. |
-| `test_engine.py` | Required env names, fail-closed settings, port casting and loaded config. |
-| `test_ingestion.py` | Ingestion CLI defaults/table selection and bronze primary keys against contracts. |
-| `test_makefile.py` | `help`, `verify`, `contracts-check`, notebook and Airflow targets, plus destructive-target confirmation guards. |
-| `test_pipeline_triggers.py` | Failure triggers write one deduplicated `audit.error_log` row per failed task/batch. |
-| `test_publish_marts.py` | PII exclusion, Databricks type mapping, SQL escaping, batching, char budgets and handled HTTP errors. |
-| `test_run_notebooks.py` | Missing data directories and execution of a small notebook through a kernel. |
+| `conftest.py` | Default env vars so modules import without a real `.env`; folder marker hook. |
+| `unit/test_audit.py` | Audit labels, required columns, `TaskHandle` and sanitised errors. |
+| `unit/test_connection.py` | Connection getters, quiet logger and Databricks retry configuration. |
+| `unit/test_dbt_audit.py` | dbt artifact parsing, invocation rows, stale/missing artifacts and batch linkage. |
+| `unit/test_engine.py` | Required env names, fail-closed settings, port casting and loaded config. |
+| `unit/test_ingestion.py` | Ingestion CLI defaults and contract selection. |
+| `unit/test_load_fixtures.py` | Fixture type mapping, fail-closed guard and source-spec construction. |
+| `unit/test_publish_marts.py` | PII exclusion, Databricks type mapping, SQL escaping, batching, char budgets and handled HTTP errors. |
+| `unit/test_run_notebooks.py` | Missing data directories before a kernel starts. |
+| `integration/conftest.py` | Throwaway Postgres database built from `sql/scripts/01..07`. |
+| `integration/test_audit_db.py` | Audit helpers write only allowed rows and roll back cleanly. |
+| `integration/test_ingestion_fixture.py` | Bronze primary keys and fixture rows through the bronze write path. |
+| `integration/test_notebook_execution.py` | A small notebook runs through a real Jupyter kernel. |
+| `integration/test_pipeline_triggers.py` | Failure triggers write one deduplicated `audit.error_log` row per failed task/batch. |
+| `smoke/test_env_and_connectivity.py` | Required env settings and a Postgres reachability query. |
+| `smoke/test_imports.py` | Production modules import cleanly. |
+| `smoke/test_makefile.py` | `help`, `verify`, `contracts-check`, notebook and Airflow targets, plus destructive-target confirmation guards. |
 
 ## Airflow suite — `airflow/tests/`
 
@@ -95,6 +119,8 @@ checks with `make dbt-silver-tests ENV=dev`, `make dbt-gold-tests ENV=dev`,
   YAML source names match the index and contract landing tables match
   `dbt/models/bronze/sources.yml`. It does not compare columns, types or
   sample rows yet.
+- `scripts/load_fixtures.py` only writes to `fleet_dev` or `fleet_it_*` databases,
+  expands sample rows with missing referenced keys, and requires `FIXTURE_LOAD=1`.
 
 ## Operational and helper checks
 
@@ -123,21 +149,57 @@ secrets. None of these helpers is wired into `make verify` yet.
 - `helpers/protect_env.sh --install` can install a pre-commit secret guard; it
   is not installed by default.
 
+## GitHub Actions
+
+`ci.yml` runs on pull requests and pushes to `main`. PR and push runs perform
+lint, unit tests, contract checks, `dbt parse`, Airflow tests, a Gitleaks scan,
+integration tests against a throwaway Postgres service, audit/control bootstrap,
+and a dbt fixture build in `ci_pr_<n>_*` schemas. The image build job waits for
+all checks, builds the
+Airflow image with `GIT_SHA`, runs the in-image smoke script and pushes
+`ghcr.io/<owner>/<repo>:sha-<commit>` only on `main`.
+
+`deploy.yml` runs on successful CI completion for `main` and deploys staging,
+then runs read-only smoke checks. Production uses `workflow_dispatch` with a
+commit SHA, requires the `production` environment approval, and resolves the
+same GHCR tag to a digest before deploying that digest. Staging and production
+deployments call `scripts/deploy.sh` over SSH and pull the image by digest; no
+`latest` tag is used.
+
+Configure these repository secrets before deployment:
+
+| Secret | Use |
+|---|---|
+| `STAGING_SSH_KEY` | SSH private key for the staging host. |
+| `STAGING_DEPLOY_HOST` | Staging host name or address. |
+| `STAGING_DEPLOY_USER` | SSH user with Docker Compose access. |
+| `STAGING_DEPLOY_PATH` | Repository root on the staging host. |
+| `PRODUCTION_SSH_KEY` | SSH private key for the production host. |
+| `PRODUCTION_DEPLOY_HOST` | Production host name or address. |
+| `PRODUCTION_DEPLOY_USER` | SSH user with Docker Compose access. |
+| `PRODUCTION_DEPLOY_PATH` | Repository root on the production host. |
+| `GITLEAKS_LICENSE` | Required by Gitleaks for organisation or enterprise accounts. |
+
+Create GitHub environments named `staging` and `production`. Add required
+reviewers to `production` so the manual approval gate is enforced by GitHub.
+The remote hosts need Docker Compose, a populated `.env`, and network access to
+GHCR. The compose file reads `AIRFLOW_IMAGE` so the deploy can pin a digest.
+
 ## Current known gaps
 
-- No `.github/workflows` CI pipeline is tracked; `make ci` only runs `verify`.
-- No `smoke` or `smoke_prod` tests exist, although both markers are declared.
+- `make ci` is a local alias for `verify`; the full pipeline runs in GitHub Actions.
+- `smoke` tests exist under `tests/smoke/`; no `smoke_prod` tests exist yet.
 - No coverage plugin, `[tool.coverage.*]` config or enforced `COV_MIN` gate is
   implemented.
 - No dbt unit tests, snapshots or full column-level contract enforcement yet.
-- Some documentation references `ci`, smoke and release jobs that are not
-  present in this checkout.
+- No release or cleanup workflow is tracked yet.
 
 ## Adding tests
 
-- Add Python tests to `tests/` and Airflow tests to `airflow/tests/`.
-- Use the declared markers (`unit`, `integration`, `contract`, `smoke`,
-  `smoke_prod`) and never log credentials or row values.
+- Add Python tests to `tests/unit/`, `tests/integration/` or `tests/smoke/` and
+  Airflow tests to `airflow/tests/`.
+- Folder markers are applied automatically; use explicit markers only for
+  `contract` or `smoke_prod`, and never log credentials or row values.
 - Add dbt column tests in the layer `schema.yml` files and generic tests under
   `dbt/tests/generic/silver/`.
 - Never weaken, disable or delete a test to make a run pass; fix the data or

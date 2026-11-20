@@ -1,0 +1,232 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AIRFLOW_VERSION: "3.3.2"
+  PYTHON_IMAGE_VERSION: "3.13"
+  PG_HOST: localhost
+  PG_PORT: "5432"
+  PG_USER: postgres
+  PG_PASSWORD: postgres
+  PG_DBNAME: fleet_dev
+  DB_NAME: fleet_dev
+  MONGO_URI: mongodb://localhost:27017
+  MONGO_DB_NAME: fleet_operations
+  MYSQL_HOST: localhost
+  MYSQL_PORT: "3306"
+  MYSQL_USER: root
+  MYSQL_PASSWORD: postgres
+  MYSQL_DATABASE: fleet_registry
+  MYSQL_SERVER_TZ: UTC
+  MYSQL_SSL_MODE: PREFERRED
+  DATABRICKS_HOST: https://example.databricks.com
+  DATABRICKS_HTTP_PATH: /sql/1.0/warehouses/example
+  DATABRICKS_TOKEN: placeholder
+  SMTP_HOST: localhost
+  SMTP_PORT: "25"
+  ALERT_EMAIL_FROM: ci@example.com
+  ALERT_EMAIL_TO: ci@example.com
+  DBT_TARGET: ci
+  DBT_SCHEMA_PREFIX: ci_pr_${{ github.event.pull_request.number || github.run_number }}_
+  FIXTURE_LOAD: "1"
+  GIT_SHA: ${{ github.sha }}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: make install
+      - name: Run Ruff
+        run: make lint-fast
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: make install
+      - name: Run unit tests
+        run: make py-unit
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: make install
+      - name: Check contracts
+        run: make contracts-check
+
+  dbt-parse:
+    name: dbt parse
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: make install
+      - name: Install dbt packages
+        run: make dbt-deps
+      - name: Parse dbt project
+        run: make dbt-parse ENV=ci
+
+  airflow-test:
+    name: Airflow tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: make install
+      - name: Run Airflow tests
+        run: make airflow-test
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  integration:
+    name: Integration and dbt fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fleet_dev
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: make install
+      - name: Run integration tests
+        run: make py-integration
+      - name: Bootstrap audit and control schemas
+        run: make CONFIRM=yes db-init-audit
+      - name: Install dbt packages
+        run: make dbt-deps
+      - name: Load contract fixtures
+        run: make load-fixtures ENV=ci
+      - name: Build dbt with fixtures
+        run: make dbt-build ENV=ci EXCLUDE=unit_test
+
+  image-build:
+    name: Build and smoke image
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs:
+      - lint
+      - unit-tests
+      - contracts
+      - dbt-parse
+      - airflow-test
+      - secret-scan
+      - integration
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Resolve image reference
+        id: image
+        run: |
+          repository="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          printf 'ref=ghcr.io/%s:sha-%s\n' "$repository" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          file: airflow/Dockerfile
+          load: true
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.image.outputs.ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            AIRFLOW_VERSION=${{ env.AIRFLOW_VERSION }}
+            PYTHON_VERSION=${{ env.PYTHON_IMAGE_VERSION }}
+            GIT_SHA=${{ github.sha }}
+      - name: Smoke test image
+        run: |
+          docker run --rm \
+            --entrypoint /opt/fleet/airflow/scripts/smoke.sh \
+            -e PG_HOST -e PG_PORT -e PG_USER -e PG_PASSWORD -e PG_DBNAME \
+            -e MONGO_URI -e MONGO_DB_NAME \
+            -e MYSQL_HOST -e MYSQL_PORT -e MYSQL_USER -e MYSQL_PASSWORD \
+            -e MYSQL_DATABASE -e MYSQL_SERVER_TZ -e MYSQL_SSL_MODE \
+            -e DATABRICKS_HOST -e DATABRICKS_HTTP_PATH -e DATABRICKS_TOKEN \
+            -e SMTP_HOST -e SMTP_PORT -e ALERT_EMAIL_FROM -e ALERT_EMAIL_TO \
+            -e DBT_TARGET \
+            "${{ steps.image.outputs.ref }}"

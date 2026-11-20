@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MAKEFILE = ROOT / "Makefile"
 
 
@@ -27,7 +27,6 @@ def _make(*args: str) -> str:
     return completed.stdout
 
 
-@pytest.mark.unit
 def test_help_documents_verify_target() -> None:
     """Expose the verification command in the generated help output."""
     help_output = _make("help")
@@ -36,7 +35,6 @@ def test_help_documents_verify_target() -> None:
     assert "Run all non-destructive local quality checks." in help_output
 
 
-@pytest.mark.unit
 def test_help_documents_airflow_targets() -> None:
     """Expose the supported local Airflow commands in help."""
     help_output = _make("help")
@@ -45,7 +43,6 @@ def test_help_documents_airflow_targets() -> None:
     assert "airflow-up" in help_output
 
 
-@pytest.mark.unit
 def test_contracts_check_is_a_documented_read_only_target() -> None:
     """Keep the preflight contract check available through Make."""
     help_output = _make("help")
@@ -56,7 +53,6 @@ def test_contracts_check_is_a_documented_read_only_target() -> None:
     assert "psql" not in dry_run
 
 
-@pytest.mark.unit
 def test_verify_dry_run_contains_only_quality_checks() -> None:
     """Keep verification independent of database and dbt write targets."""
     dry_run = _make("--dry-run", "verify")
@@ -67,7 +63,6 @@ def test_verify_dry_run_contains_only_quality_checks() -> None:
     assert "psql" not in dry_run
 
 
-@pytest.mark.unit
 def test_notebooks_dry_run_executes_the_runner() -> None:
     """Keep notebook execution behind its own non-mutating target."""
     dry_run = _make("--dry-run", "notebooks")
@@ -76,7 +71,6 @@ def test_notebooks_dry_run_executes_the_runner() -> None:
     assert "--inplace" not in dry_run
 
 
-@pytest.mark.unit
 def test_destructive_targets_keep_the_confirmation_guard() -> None:
     """Require an explicit confirmation before destructive operations."""
     makefile = MAKEFILE.read_text(encoding="utf-8")

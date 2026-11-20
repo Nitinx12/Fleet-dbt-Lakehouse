@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Repository rules
+    url: https://github.com/Nitinx12/Fleet-dbt-warehouse/blob/main/AGENTS.md
+    about: Read contribution rules, permissions and definition of done.
