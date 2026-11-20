@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -19,15 +20,38 @@ if not DBT.exists():
     DBT = "dbt"
 
 
-def main() -> int:
+def _arguments(argv: list[str] | None = None) -> tuple[argparse.Namespace, list[str]]:
+    """Extract optional Airflow context without passing it to dbt."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--batch-id", type=int)
+    parser.add_argument("--airflow-dag-id")
+    parser.add_argument("--airflow-run-id")
+    args, dbt_argv = parser.parse_known_args(argv)
+    if args.batch_id is not None and args.batch_id <= 0:
+        parser.error("--batch-id must be positive")
+    return args, dbt_argv
+
+
+def main(argv: list[str] | None = None) -> int:
     """Run dbt, audit the invocation, and return dbt's own exit code."""
+    args, dbt_argv = _arguments(sys.argv[1:] if argv is None else argv)
     started = datetime.now(UTC)
-    exit_code = subprocess.call([str(DBT), *sys.argv[1:]], cwd=ROOT / "dbt")
-    audit_invocation(started, exit_code, dbt_target=_dbt_target(sys.argv[1:]))
+    exit_code = subprocess.call([str(DBT), *dbt_argv], cwd=ROOT / "dbt")
+    audit_invocation(
+        started,
+        exit_code,
+        dbt_target=_dbt_target(dbt_argv),
+        batch_id=args.batch_id,
+    )
     return exit_code
 
 
-def audit_invocation(started: datetime, exit_code: int, dbt_target: str) -> None:
+def audit_invocation(
+    started: datetime,
+    exit_code: int,
+    dbt_target: str,
+    batch_id: int | None = None,
+) -> None:
     """Best effort: a broken audit trail must never hide dbt's exit code."""
     from utils import dbt_audit
     from utils.logger import get_logger
@@ -39,6 +63,7 @@ def audit_invocation(started: datetime, exit_code: int, dbt_target: str) -> None
             started_after=started,
             exit_code=exit_code,
             dbt_target=dbt_target,
+            batch_id=batch_id,
         )
     except Exception as error:  # noqa: BLE001 - dbt's exit code must be preserved
         log.error("dbt audit load failed (%s)", type(error).__name__)

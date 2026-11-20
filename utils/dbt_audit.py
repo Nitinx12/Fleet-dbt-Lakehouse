@@ -90,6 +90,7 @@ def audit_invocation(
     started_after: datetime,
     exit_code: int,
     dbt_target: str | None = None,
+    batch_id: int | None = None,
     target: Engine | Connection | None = None,
 ) -> tuple[int, int]:
     """Land one finished dbt invocation in audit.*; returns (run_rows, dq_rows)."""
@@ -122,7 +123,9 @@ def audit_invocation(
         log.debug("dbt %s produced no auditable nodes", command)
         return 0, 0
 
-    batch_id = resolve_batch(target=target)
+    owns_batch = batch_id is None
+    if batch_id is None:
+        batch_id = resolve_batch(target=target)
     try:
         _log_invocation(
             _invocation_row(
@@ -140,15 +143,17 @@ def audit_invocation(
         run_count = audit.log_dbt_results(batch_id, run_rows, target=target)
         dq_count = audit.log_data_quality(batch_id, dq_rows, target=target)
     except Exception:
-        _finish_batch(batch_id, "FAILED", "audit load failed; see logs", target)
+        if owns_batch:
+            _finish_batch(batch_id, "FAILED", "audit load failed; see logs", target)
         raise
 
-    _finish_batch(
-        batch_id,
-        "SUCCEEDED" if exit_code == 0 else "FAILED",
-        None if exit_code == 0 else f"dbt exited with code {exit_code}",
-        target,
-    )
+    if owns_batch:
+        _finish_batch(
+            batch_id,
+            "SUCCEEDED" if exit_code == 0 else "FAILED",
+            None if exit_code == 0 else f"dbt exited with code {exit_code}",
+            target,
+        )
     log.info(
         "audit batch %s: %s run rows, %s data quality rows from dbt %s",
         batch_id,

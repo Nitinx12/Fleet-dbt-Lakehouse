@@ -230,6 +230,42 @@ def test_non_data_commands_write_nothing(tmp_path: Path) -> None:
     assert written == (0, 0)
 
 
+@pytest.mark.unit
+def test_provided_batch_is_not_finished(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Leave a shared Airflow batch open for the DAG finalizer."""
+    _write_artifacts(
+        tmp_path,
+        invocation_started_at="2026-11-18T05:55:12.639947Z",
+        which="run",
+    )
+    finished: list[tuple[object, ...]] = []
+    monkeypatch.setattr(dbt_audit, "_log_invocation", lambda *args, **kwargs: None)
+    monkeypatch.setattr(dbt_audit.audit, "log_dbt_results", lambda *args, **kwargs: 1)
+    monkeypatch.setattr(dbt_audit.audit, "log_data_quality", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(
+        dbt_audit,
+        "_finish_batch",
+        lambda *args, **kwargs: finished.append(args),
+    )
+    monkeypatch.setattr(
+        dbt_audit,
+        "resolve_batch",
+        lambda *args, **kwargs: pytest.fail("shared batch must not be replaced"),
+    )
+
+    written = dbt_audit.audit_invocation(
+        tmp_path,
+        started_after=datetime(2026, 1, 1, tzinfo=UTC),
+        exit_code=0,
+        batch_id=19,
+    )
+
+    assert written == (1, 0)
+    assert finished == []
+
+
 def _write_artifacts(
     dbt_dir: Path,
     *,

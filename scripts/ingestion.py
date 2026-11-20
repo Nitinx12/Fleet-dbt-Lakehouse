@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import re
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -196,7 +198,9 @@ def _registry_row(contract: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _ensure_registry(pg: Engine, contracts: list[dict[str, Any]]) -> list[Source]:
+def _ensure_registry(
+    pg: Engine, contracts: list[dict[str, Any]], dag_id: str = DAG_ID
+) -> list[Source]:
     """Upsert the pipeline and every contract into control; return load-ordered sources."""
     rows = [_registry_row(c) for c in contracts]
     rows.sort(key=lambda r: (r["load_type"] != "FULL", r["table"]))
@@ -226,7 +230,7 @@ def _ensure_registry(pg: Engine, contracts: list[dict[str, Any]]) -> list[Source
                 RETURNING pipeline_id
                 """
             ),
-            {"name": PIPELINE_NAME, "dag": DAG_ID},
+            {"name": PIPELINE_NAME, "dag": dag_id},
         ).scalar_one()
 
         for row in rows:
@@ -271,7 +275,7 @@ def _ensure_registry(pg: Engine, contracts: list[dict[str, Any]]) -> list[Source
     return sources
 
 
-def _start_batch(pg: Engine, run_id: str) -> int:
+def _start_batch(pg: Engine, run_id: str, dag_id: str = DAG_ID) -> int:
     """Open the control batch for this script run."""
     with pg.begin() as conn:
         return int(
@@ -285,7 +289,7 @@ def _start_batch(pg: Engine, run_id: str) -> int:
                 ),
                 {
                     "pipeline_name": PIPELINE_NAME,
-                    "dag_id": DAG_ID,
+                    "dag_id": dag_id,
                     "run_id": run_id,
                     "logical_date": datetime.now(UTC),
                 },
@@ -578,10 +582,11 @@ def _ingest_one(
     spec: Source,
     batch_id: int,
     run_id: str,
+    dag_id: str = DAG_ID,
 ) -> Stats:
     """Extract one source into bronze and write its control/audit rows."""
     with audit.task_run(
-        batch_id, DAG_ID, run_id, f"ingest_{spec.target}", layer="bronze"
+        batch_id, dag_id, run_id, f"ingest_{spec.target}", layer="bronze"
     ) as task:
         lower = _watermark(pg, spec)
         if spec.system == "mysql":
@@ -682,11 +687,58 @@ def _report(pg: Engine, batch_id: int, stats: list[Stats]) -> None:
     log.info("databricks connectivity: %s", _databricks_status())
 
 
-def main() -> int:
+def _arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse optional Airflow context and an optional contract-table filter."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", choices=("mysql", "mongo"))
+    parser.add_argument("--table")
+    parser.add_argument("--batch-id", type=int)
+    parser.add_argument("--airflow-dag-id", default=DAG_ID)
+    parser.add_argument("--airflow-run-id")
+    args = parser.parse_args(argv)
+    if args.table and not args.source:
+        parser.error("--table requires --source")
+    if args.batch_id is not None and args.batch_id <= 0:
+        parser.error("--batch-id must be positive")
+    return args
+
+
+def _selected_contracts(
+    contracts: list[dict[str, Any]], source: str | None, table: str | None
+) -> list[dict[str, Any]]:
+    """Return contracts selected for a source and optional table invocation."""
+    systems = {"mysql": "mysql", "mongo": "mongodb"}
+    selected = contracts
+    if source is not None:
+        selected = [
+            contract
+            for contract in selected
+            if contract["source"].split(".", 1)[0] == systems[source]
+        ]
+    if table is not None:
+        selected = [
+            contract
+            for contract in selected
+            if contract["source"].rsplit(".", 1)[1] == table
+        ]
+    if not selected:
+        selection = f"{source or 'all'}.{table or 'all'}"
+        raise ValueError(f"no contract matches {selection}")
+    return selected
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     """Run one full ingestion pass; 0 on success, 1 on a failed batch."""
+    args = _arguments(argv)
     contracts = [read_contract(path) for path in sorted(CONTRACTS_DIR.glob("*.yml"))]
     if not contracts:
         log.error("no contracts found in %s", CONTRACTS_DIR)
+        return 1
+
+    try:
+        contracts = _selected_contracts(contracts, args.source, args.table)
+    except ValueError as error:
+        log.error("ingestion selection failed (%s)", type(error).__name__)
         return 1
 
     pg = get_postgres_engine()
@@ -703,16 +755,22 @@ def main() -> int:
         pg.url.database,
     )
 
-    sources = _ensure_registry(pg, contracts)
-    run_id = f"manual__{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
-    batch_id = _start_batch(pg, run_id)
+    sources = _ensure_registry(pg, contracts, args.airflow_dag_id)
+    run_id = args.airflow_run_id or f"manual__{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
+    owns_batch = args.batch_id is None
+    batch_id = args.batch_id or _start_batch(pg, run_id, args.airflow_dag_id)
     log.info("batch %s started (run %s)", batch_id, run_id)
 
     stats: list[Stats] = []
     try:
         for spec in sources:
-            stats.append(_ingest_one(pg, mysql, mongo, spec, batch_id, run_id))
-        _finish_batch(pg, batch_id, "SUCCEEDED")
+            stats.append(
+                _ingest_one(
+                    pg, mysql, mongo, spec, batch_id, run_id, args.airflow_dag_id
+                )
+            )
+        if owns_batch:
+            _finish_batch(pg, batch_id, "SUCCEEDED")
         _report(pg, batch_id, stats)
         log.info("batch %s SUCCEEDED", batch_id)
         return 0
@@ -723,11 +781,12 @@ def main() -> int:
             component="INGESTION",
             layer="bronze",
             batch_id=batch_id,
-            airflow_dag_id=DAG_ID,
+            airflow_dag_id=args.airflow_dag_id,
             task_id="ingest_bronze",
             error_message=message,
         )
-        _finish_batch(pg, batch_id, "FAILED", message)
+        if owns_batch:
+            _finish_batch(pg, batch_id, "FAILED", message)
         return 1
     finally:
         mongo.client.close()
