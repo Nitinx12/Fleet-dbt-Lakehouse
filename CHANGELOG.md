@@ -34,9 +34,14 @@ all current work is listed under `Unreleased`.
 - Reproducible notebook runner and generated executed-notebook handling.
 - Detailed `README.md` and `airflow/README.md` covering setup, DAG triggering,
   the daily task graph, audit linkage and troubleshooting.
+- `docs/DBT.md` and `docs/TESTING.md` guides covering the dbt project and the
+  full current test/check inventory.
 
 ### Changed
 
+- Rewrote the root `README.md` as a concise project front door with an updated
+  repository map and links to `docs/DBT.md`, `docs/TESTING.md` and
+  `airflow/README.md`.
 - `make db-init` now applies `sql/scripts/01..07` in order.
 - `make airflow-up` and `make airflow-down` pass `--env-file .env` while keeping
   compose-relative build contexts and mounts intact.
