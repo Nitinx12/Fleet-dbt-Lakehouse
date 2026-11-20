@@ -17,17 +17,17 @@ USER airflow
 WORKDIR /opt/fleet
 
 ENV PATH="/home/airflow/.local/bin:/opt/venv/bin:${PATH}" \
-    PYTHONPATH="/opt/fleet:/opt/fleet/airflow" \
+    PYTHONPATH="/opt/fleet:/opt/fleet/airflow:/home/airflow/.local/lib/python${PYTHON_VERSION}/site-packages:/opt/venv/lib/python${PYTHON_VERSION}/site-packages" \
     UV_PROJECT_ENVIRONMENT="/opt/venv" \
     UV_PYTHON="/usr/local/bin/python" \
     UV_PYTHON_DOWNLOADS=never \
     UV_NO_CACHE=1
 
-COPY --chown=airflow:root airflow/requirements-airflow.txt /tmp/requirements-airflow.txt
+COPY --chown=airflow:root airflow/requirments-airflow.txt /tmp/requirments-airflow.txt
 RUN pip install --no-cache-dir --user \
       --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt" \
       "apache-airflow==${AIRFLOW_VERSION}" \
-      -r /tmp/requirements-airflow.txt \
+      -r /tmp/requirments-airflow.txt \
     && pip install --no-cache-dir --user "uv==${UV_VERSION}"
 
 COPY --chown=airflow:root pyproject.toml uv.lock ./
@@ -35,5 +35,6 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY --chown=airflow:root --chmod=755 airflow/scripts/ /opt/fleet/airflow/scripts/
 COPY --chown=airflow:root . /opt/fleet
+RUN chmod +x /opt/fleet/airflow/scripts/*.sh
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--", "/opt/fleet/airflow/scripts/entrypoint.sh"]

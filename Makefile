@@ -147,10 +147,10 @@ airflow-test: check-version ## Run Airflow orchestration tests.
 		airflow/tests/test_callbacks.py airflow/tests/test_summary.py airflow/tests/test_watchdog.py
 
 airflow-up: ## Start the local Airflow stack.
-	$(Q)docker compose -f airflow/compose.yml -f airflow/compose.dev.yml up -d --build
+	$(Q)docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml up -d --build
 
 airflow-down: ## Stop the local Airflow stack.
-	$(Q)docker compose -f airflow/compose.yml -f airflow/compose.dev.yml down
+	$(Q)docker compose --env-file .env -f airflow/compose.yml -f airflow/compose.dev.yml down
 
 ## Notebooks
 .PHONY: notebooks

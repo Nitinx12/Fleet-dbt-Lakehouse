@@ -19,7 +19,6 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__API__BASE_URL: ${AIRFLOW_BASE_URL:?Set AIRFLOW_BASE_URL in .env}
-    PYTHONPATH: /opt/fleet:/opt/fleet/airflow
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     airflow-metadata:
