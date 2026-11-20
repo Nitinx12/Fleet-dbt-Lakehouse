@@ -175,6 +175,7 @@ db-init: check-tools ## Create the warehouse database and apply SQL bootstrap sc
 	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/04_control_batch_tracking.sql"
 	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/05_control_watermarks.sql"
 	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/06_audit_relationships.sql"
+	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/07_pipeline_event_triggers.sql"
 
 ingest: check-version ## Load MySQL and MongoDB sources into the bronze layer.
 	$(Q)$(call require_environment)

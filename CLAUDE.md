@@ -19,7 +19,7 @@ The rules above apply to every task. This file adds Claude Code specifics: where
 make setup                          # uv sync --frozen + pre-commit
 make up / make down                 # local MySQL, MongoDB, Postgres
 make env-check                      # required env vars present
-make db-init                        # sql/scripts 01..05 against fleet_warehouse
+make db-init                        # sql/scripts 01..07 against fleet_warehouse
 make lint-fast                      # ruff check
 make fmt                            # ruff format + --fix
 make py-test                        # Python tests
