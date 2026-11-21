@@ -42,10 +42,11 @@ all current work is listed under `Unreleased`.
 - Smoke coverage for production imports, required environment settings, Postgres
   reachability and safe Makefile targets, plus `make py-unit`,
   `make py-integration` and `make py-smoke`.
-- GitHub Actions CI and deploy workflows with SHA-pinned actions, Gitleaks,
-  fixture-backed dbt builds, image smoke tests, GHCR `sha-<commit>` images,
-  digest-based SSH/Compose staging deploys and manually approved production
-  deploys.
+- GitHub Actions CI and deploy workflows with SHA-pinned actions, fixture-backed
+  dbt builds, image smoke tests, GHCR `sha-<commit>` images, digest-based
+  SSH/Compose staging deploys and manually approved production deploys.
+- `leaks.yml` runs checksum-verified Gitleaks over full history with a narrow
+  `.gitleaks.toml` allowlist; it replaces the duplicate CI secret-scan job.
 - `.github/CODEOWNERS`, pull request and issue templates; `scripts/load_fixtures.py`
   and `scripts/deploy.sh`; a `ci` dbt target with prefixed layer schemas.
 - `make db-init-audit` to bootstrap audit/control tables in a CI database without
@@ -104,3 +105,5 @@ all current work is listed under `Unreleased`.
 - Fixture loading now adds missing referenced rows so the full dbt fixture build
   passes its relationship tests, and CI bootstraps audit/control before dbt so
   the best-effort audit loader can record the invocation.
+- CI supplies `DATABRICKS_SCHEMA`, and Makefile psql bootstrap targets connect
+  with `PG_HOST`, `PG_PORT` and `PG_PASSWORD` instead of the local Unix socket.

@@ -1,15 +1,47 @@
-Welcome to your new dbt project!
+# dbt project
 
-### Using the starter project
+dbt owns all transformations: Postgres `bronze` (read-only) → `silver` → `gold` → `marts`. Airflow orchestrates; approved non-PII marts are synced to Databricks.
 
-Try running the following commands:
-- dbt run
-- dbt test
+## Layout
 
+| Path | Purpose |
+|---|---|
+| `dbt_project.yml` | Project name, layer schemas, vars (`silver_lookback_hours`, `gold_lookback_hours`, `gold_date_start/end`). |
+| `profiles.yml` | Postgres targets `dev`, `ci`, `prod`. |
+| `packages.yml` | `dbt_utils`; lockfile is `package-lock.yml`. |
+| `models/bronze/sources.yml` | Only source: 12 landed bronze tables. |
+| `models/silver/` | 12 staging models + `schema.yml`. |
+| `models/gold/` | 8 dimensions, 6 facts + `schema.yml`. |
+| `models/marts/` | 6 BI marts, reconciliation model + `schema_marts.yml`. |
+| `macros/` | Cleaning, incremental, schema, gold and mart helpers. |
+| `tests/generic/silver/` | 11 custom generic tests. |
 
-### Resources:
-- Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
-- Check out [Discourse](https://discourse.getdbt.com/) for commonly asked questions and answers
-- Join the [chat](https://community.getdbt.com/) on Slack for live discussions and support
-- Find [dbt events](https://events.getdbt.com) near you
-- Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
+Generated and not committed: `target/`, `logs/`, `dbt_packages/`.
+
+## Rules
+
+- Always use `{{ source() }}` and `{{ ref() }}`; never write to `bronze`.
+- Every model and column has a description and `meta` (`owner`, `tier`, `serve`, `contains_pii`); keys have `unique`/`not_null` and logical FKs have `relationships` tests.
+- PII is hashed/masked in `gold`; `mart_driver_scorecard_monthly` stays in Postgres.
+- Thresholds are vars, not literals; money is `decimal`; timestamps are UTC.
+- `silver` and facts are incremental; use the lookback vars and watermark macros.
+
+## Commands
+
+Run from the repo root; `make help` is authoritative. All dbt targets call `scripts/run_dbt.py` for audit logging.
+
+```bash
+make dbt-deps
+make dbt-parse ENV=dev
+make dbt-compile ENV=dev SELECT="silver"
+make dbt-silver ENV=dev && make dbt-silver-tests ENV=dev
+make dbt-gold ENV=dev && make dbt-gold-tests ENV=dev
+make dbt-marts ENV=dev && make dbt-marts-tests ENV=dev
+make dbt-build ENV=dev
+make dbt-test ENV=dev
+make dbt-docs ENV=dev
+```
+
+`dev` writes to `DBT_DEV_SCHEMA` in `fleet_warehouse`; `ci` prefixes schemas with `DBT_SCHEMA_PREFIX` in `fleet_dev`. `prod` requires `ENV=prod CONFIRM=yes` and explicit approval. Full refresh/backfills require `CONFIRM=yes`.
+
+See `docs/DBT.md` for macros, variables, gotchas and the CI fixture flow.

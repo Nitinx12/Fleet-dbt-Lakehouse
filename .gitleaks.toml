@@ -1,0 +1,32 @@
+title = "Fleet secret scan config"
+minVersion = "v8.25.0"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Known local database placeholders in the example env file"
+condition = "AND"
+paths = ['''(^|/)\.env\.example$''']
+regexTarget = "line"
+regexes = [
+  '''(?i)^[A-Z_]+=(?:postgres|placeholder|changeme|change_me|replace_me|your[_-][A-Za-z0-9_]+)$''',
+]
+
+[[allowlists]]
+description = "CI-only placeholder credentials"
+condition = "AND"
+paths = ['''(^|/)\.github/workflows/ci\.yml$''']
+regexTarget = "line"
+regexes = [
+  '''(?i)\b(?:placeholder|postgres|example\.com)\b''',
+]
+
+[[allowlists]]
+description = "Documented placeholder credentials"
+condition = "AND"
+paths = ['''(^|/)docs/''']
+regexTarget = "line"
+regexes = [
+  '''(?i)\b(?:placeholder|changeme|change_me|replace_me|your[_-][A-Za-z0-9_]+|example\.com)\b''',
+]

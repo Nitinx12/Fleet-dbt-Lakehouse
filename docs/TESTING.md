@@ -152,12 +152,16 @@ secrets. None of these helpers is wired into `make verify` yet.
 ## GitHub Actions
 
 `ci.yml` runs on pull requests and pushes to `main`. PR and push runs perform
-lint, unit tests, contract checks, `dbt parse`, Airflow tests, a Gitleaks scan,
-integration tests against a throwaway Postgres service, audit/control bootstrap,
-and a dbt fixture build in `ci_pr_<n>_*` schemas. The image build job waits for
-all checks, builds the
-Airflow image with `GIT_SHA`, runs the in-image smoke script and pushes
+lint, unit tests, contract checks, `dbt parse`, Airflow tests, integration tests
+against a throwaway Postgres service, audit/control bootstrap, and a dbt fixture
+build in `ci_pr_<n>_*` schemas. The image build job waits for all checks, builds
+the Airflow image with `GIT_SHA`, runs the in-image smoke script and pushes
 `ghcr.io/<owner>/<repo>:sha-<commit>` only on `main`.
+
+`leaks.yml` runs Gitleaks over the full history on pull requests, pushes to
+`main`, a weekly schedule and manual dispatch. It downloads a checksum-verified
+binary and uses `.gitleaks.toml`, which extends the default rules with narrow
+allowlists for documented placeholders. No Gitleaks licence secret is required.
 
 `deploy.yml` runs on successful CI completion for `main` and deploys staging,
 then runs read-only smoke checks. Production uses `workflow_dispatch` with a
@@ -178,7 +182,6 @@ Configure these repository secrets before deployment:
 | `PRODUCTION_DEPLOY_HOST` | Production host name or address. |
 | `PRODUCTION_DEPLOY_USER` | SSH user with Docker Compose access. |
 | `PRODUCTION_DEPLOY_PATH` | Repository root on the production host. |
-| `GITLEAKS_LICENSE` | Required by Gitleaks for organisation or enterprise accounts. |
 
 Create GitHub environments named `staging` and `production`. Add required
 reviewers to `production` so the manual approval gate is enforced by GitHub.

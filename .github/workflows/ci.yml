@@ -35,6 +35,7 @@ env:
   MYSQL_SSL_MODE: PREFERRED
   DATABRICKS_HOST: https://example.databricks.com
   DATABRICKS_HTTP_PATH: /sql/1.0/warehouses/example
+  DATABRICKS_SCHEMA: marts
   DATABRICKS_TOKEN: placeholder
   SMTP_HOST: localhost
   SMTP_PORT: "25"
@@ -123,20 +124,6 @@ jobs:
       - name: Run Airflow tests
         run: make airflow-test
 
-  secret-scan:
-    name: Secret scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          fetch-depth: 0
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-
   integration:
     name: Integration and dbt fixtures
     runs-on: ubuntu-latest
@@ -184,7 +171,6 @@ jobs:
       - contracts
       - dbt-parse
       - airflow-test
-      - secret-scan
       - integration
     permissions:
       contents: read
