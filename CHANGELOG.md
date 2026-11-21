@@ -105,3 +105,5 @@ all current work is listed under `Unreleased`.
 - Fixture loading now adds missing referenced rows so the full dbt fixture build
   passes its relationship tests, and CI bootstraps audit/control before dbt so
   the best-effort audit loader can record the invocation.
+- CI supplies `DATABRICKS_SCHEMA`, and Makefile psql bootstrap targets connect
+  with `PG_HOST`, `PG_PORT` and `PG_PASSWORD` instead of the local Unix socket.

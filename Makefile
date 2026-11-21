@@ -22,6 +22,9 @@ CONFIRM ?=
 V ?= 0
 DB_USER ?= postgres
 DB_NAME ?= fleet_warehouse
+PG_HOST ?= localhost
+PG_PORT ?= 5432
+PG_PASSWORD ?=
 PYTHON_VERSION_FILE ?= .python-version
 VENV_MARKER ?= .venv/pyvenv.cfg
 VENV_STAMP ?= .venv/.installed
@@ -31,6 +34,7 @@ VENV_STAMP ?= .venv/.installed
 DBT_SELECT = $(if $(strip $(SELECT)),--select "$(SELECT)",)
 DBT_EXCLUDE = $(if $(strip $(EXCLUDE)),--exclude-resource-type "$(EXCLUDE)",)
 DBT = "$(UV)" run --no-sync python scripts/run_dbt.py
+PSQL_DB = PGPASSWORD="$(PG_PASSWORD)" "$(PSQL)" -h "$(PG_HOST)" -p "$(PG_PORT)" -U "$(DB_USER)"
 
 ifeq ($(V),1)
 Q :=
@@ -180,20 +184,20 @@ db-init: check-tools ## Create the warehouse database and apply SQL bootstrap sc
 	$(Q)$(call confirm_destructive)
 	$(Q)$(call confirm_production)
 	$(Q)printf '%s\n' "==> Initialising database $(DB_NAME) for ENV=$(ENV)"
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d postgres -v ON_ERROR_STOP=1 -f "sql/scripts/01_init_schema.sql"
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/02_audit_tables.sql"
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/03_control_pipeline_registry.sql"
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/04_control_batch_tracking.sql"
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/05_control_watermarks.sql"
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/06_audit_relationships.sql"
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/07_pipeline_event_triggers.sql"
+	$(Q)$(PSQL_DB) -d postgres -v ON_ERROR_STOP=1 -f "sql/scripts/01_init_schema.sql"
+	$(Q)$(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/02_audit_tables.sql"
+	$(Q)$(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/03_control_pipeline_registry.sql"
+	$(Q)$(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/04_control_batch_tracking.sql"
+	$(Q)$(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/05_control_watermarks.sql"
+	$(Q)$(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/06_audit_relationships.sql"
+	$(Q)$(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/07_pipeline_event_triggers.sql"
 
 db-init-audit: check-tools ## Apply audit/control bootstrap scripts to DB_NAME for CI.
 	$(Q)$(call require_cmd,$(PSQL),Install the PostgreSQL client and put psql on PATH.)
 	$(Q)$(call confirm_destructive)
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS audit; CREATE SCHEMA IF NOT EXISTS control;"
-	$(Q)for script in 02_audit_tables.sql 03_control_pipeline_registry.sql 04_control_batch_tracking.sql 05_control_watermarks.sql 06_audit_relationships.sql 07_pipeline_event_triggers.sql; do "$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/$$script"; done
-	$(Q)"$(PSQL)" -U "$(DB_USER)" -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -c "INSERT INTO control.pipeline (pipeline_name, airflow_dag_id, description, schedule_cron, owner) VALUES ('fleet_daily', 'fleet_daily_load', 'Daily fleet telemetry and operations load', '0 2 * * *', 'data-engineering') ON CONFLICT (pipeline_name) DO NOTHING"
+	$(Q)$(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS audit; CREATE SCHEMA IF NOT EXISTS control;"
+	$(Q)for script in 02_audit_tables.sql 03_control_pipeline_registry.sql 04_control_batch_tracking.sql 05_control_watermarks.sql 06_audit_relationships.sql 07_pipeline_event_triggers.sql; do $(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -f "sql/scripts/$$script"; done
+	$(Q)$(PSQL_DB) -d "$(DB_NAME)" -v ON_ERROR_STOP=1 -c "INSERT INTO control.pipeline (pipeline_name, airflow_dag_id, description, schedule_cron, owner) VALUES ('fleet_daily', 'fleet_daily_load', 'Daily fleet telemetry and operations load', '0 2 * * *', 'data-engineering') ON CONFLICT (pipeline_name) DO NOTHING"
 
 ingest: check-version ## Load MySQL and MongoDB sources into the bronze layer.
 	$(Q)$(call require_environment)

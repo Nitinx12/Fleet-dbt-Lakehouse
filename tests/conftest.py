@@ -19,6 +19,7 @@ _REQUIRED = {
     "MYSQL_DATABASE": "fleet_registry",
     "DATABRICKS_HOST": "https://localhost",
     "DATABRICKS_HTTP_PATH": "/sql/1.0/warehouses/test",
+    "DATABRICKS_SCHEMA": "marts",
     "DATABRICKS_TOKEN": "test-token",
 }
 
